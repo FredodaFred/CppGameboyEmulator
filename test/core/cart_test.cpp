@@ -6,12 +6,13 @@
 
 void test_load_file() {
     Cart cart;
-    cart.loadFromFile("./roms/tetris.gb");
-    std::cout << cart.title << std::endl; 
-    std::cout << cart.getSize() << std::endl; 
+    cart.loadFromFile("./roms/Pokemon_Red.gb");
+    cart.printHeader();
 }
 
 int main() {
+    std::cout << "----------------Running Cart Tests----------------" << std::endl;
+    std::cout << "* test_load_file" << std::endl;
     test_load_file();
     return 0;
 }

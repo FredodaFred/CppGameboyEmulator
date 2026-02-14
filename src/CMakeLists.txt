@@ -12,7 +12,7 @@ add_library(Core STATIC
 target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(GameBoyCpp
-    ui/main.cpp
+    runtime/main.cpp
 )
 
 find_package(OpenGL REQUIRED)

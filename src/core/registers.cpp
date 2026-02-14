@@ -1,6 +1,7 @@
 #include "registers.hpp"
 
-// Getters
+// Getters 
+// Reminder, we are using bit masks here and converting to booleans
 bool Registers::getZ() const { return (F & 0x80) != 0; }
 bool Registers::getN() const { return (F & 0x40) != 0; }
 bool Registers::getH() const { return (F & 0x20) != 0; }
@@ -47,6 +48,7 @@ void Registers::setReg8(Reg8 reg, uint8_t value) {
         case Reg8::E: E = value; break;
         case Reg8::H: H = value; break;
         case Reg8::L: L = value; break;
+        // We use the "& 11110000" because the last for bits need to be zeros, the first four need to remain the same
         case Reg8::F: F = value & 0xF0; break;
     }
 }
