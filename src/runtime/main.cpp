@@ -3,7 +3,17 @@
 #include "../core/cart.hpp"
 #include "../core/cpu.hpp"
 #include "../core/registers.hpp"
-#include "emulator.hpp";
+#include "emulator.hpp"
+
+Cart loadCart(std::string romPath) {
+    Cart cart;
+    cart.loadFromFile(romPath);
+    if(!cart.cart_loaded){
+        std::cerr << "Cart couldn't load" << std::endl;
+        exit;
+    } 
+    return cart;
+}
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -11,26 +21,29 @@ int main(int argc, char* argv[]) {
         return 1; 
     }
     std::string romPath = argv[1];
+
+    if (argc >= 3 && std::string_view(argv[2]) == "--log") {
+        Logger::open("cpu_trace.log");
+        Logger::set_enabled(true);
+    }
+
     // Load game
     Cart cart = loadCart(romPath);
+    Logger::log_cart_header(cart);
 
     //Setup classes
     Registers registers;
-    Bus bus(cart);
+    PPU ppu;
+    Bus bus(cart, ppu);
     CPU cpu(bus, registers);
     Emulator emulator(cpu, bus);
-
-    emulator.run();
-
+    
+    try {
+        emulator.run();
+    } catch (const std::runtime_error& e) {
+        Logger::close();
+        std::cout << e.what() << std::endl;
+    }
 }
 
-Cart loadCart(std::string romPath) {
-    Cart cart;
-    cart.loadFromFile(romPath);
-    if(!cart.cart_loaded){
-        std::cerr << "Cart couldn't laod" << std::endl;
-        exit;
-    } 
-    return cart;
-}
 

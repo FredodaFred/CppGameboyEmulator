@@ -7,7 +7,7 @@ Emulator::Emulator(CPU& cpu, Bus& bus)
 void Emulator::tick() {
     uint8_t cycles = cpu.step();
         
-        // all other components sync
+    // all other components sync
 }
 
 void Emulator::run() {

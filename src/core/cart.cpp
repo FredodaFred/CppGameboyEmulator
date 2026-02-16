@@ -46,20 +46,3 @@ void Cart::parse_header(const vector<uint8_t>& data) {
     this->licenseeCode = data.at(0x014B);
     this->version = data.at(0x014C);
 }
-
-void Cart::printHeader() {
-    if (!this->cart_loaded) return;
-
-    string cleanTitle = this->title;
-    cleanTitle.erase(std::find(cleanTitle.begin(), cleanTitle.end(), '\0'), cleanTitle.end());
-
-    std::cout << "--- Cartridge Header ---\n";
-    std::cout << std::format("Title:         {}\n", cleanTitle);
-    
-    std::cout << std::format("ROM Size:      {} ({} KB)\n", (int)rom_size, 32 << rom_size);
-    
-    std::cout << std::format("RAM Size Code: {}\n", (int)ram_size);
-    
-    std::cout << std::format("Version:       {}\n", (int)version);
-    std::cout << std::format("Licensee:      0x{:02X}\n", (int)licenseeCode);
-}

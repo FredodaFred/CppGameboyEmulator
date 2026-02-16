@@ -2,6 +2,8 @@
 #include <cstdint>
 #include "registers.hpp"
 #include "bus.hpp"
+#include "interrupts.hpp"
+#include "../log/logger.hpp"
 
 enum class Cond {
     NZ, NC, Z, C, NONE
@@ -11,7 +13,6 @@ class CPU {
     public:
         CPU(Bus& bus, Registers& registers);
         int step();
-
         
     private:
         Bus& bus;
@@ -30,6 +31,8 @@ class CPU {
         
         uint8_t fetch();
         void execute(uint8_t opcode);
+        void handle_interrupts();
+        void service_interrupt(uint8_t interrupt, uint16_t addr);
 
         // opcode executors
 

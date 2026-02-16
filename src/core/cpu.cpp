@@ -1,5 +1,7 @@
 #include "cpu.hpp"
 
+using namespace Interrupt;
+
 // Constructor
 CPU::CPU(Bus& bus, Registers& registers)
     : bus(bus), registers(registers)
@@ -8,10 +10,21 @@ CPU::CPU(Bus& bus, Registers& registers)
 // Executes a single instruction
 int CPU::step() {
     if (this->halted) {
-        return;
+        // Only when IE and IF are enabled we can "unhalt"
+        if ((bus.read(0xFFFF) & bus.read(0xFF0F) & 0x1F) != 0) {
+            this->halted = false;
+        }
+
+        clock_cycles++;
+        return clock_cycles;
     }
+    handle_interrupts();
 
     uint8_t opcode = this->fetch();
+
+    if (Logger::is_enabled()) Logger::log_cpu_state(this->registers, opcode);
+
+    this->execute(opcode);
 
     // Here we manage the clock cycles
     int cycles_passed = this->clock_cycles;
@@ -277,14 +290,55 @@ void CPU::execute(uint8_t opcode) {
     }
 }
 
+void CPU::handle_interrupts() {
+    if (!this->IME) return;
+    // NOTE: 0xFFFF is IE and 0xFF0F is IF
+    uint8_t interrupt_pending = this->bus.read(0xFFFF) & this->bus.read(0xFF0F);
+    if (interrupt_pending == 0) return;
+
+    // Priority check
+    if (interrupt_pending & Interrupt::VBLANK) {
+        service_interrupt(Interrupt::VBLANK, Interrupt::ADDR_VBLANK);
+    } else if (interrupt_pending & Interrupt::LCD_STAT) {
+        service_interrupt(Interrupt::LCD_STAT, Interrupt::ADDR_LCD_STAT);
+    } else if (interrupt_pending & Interrupt::TIMER) {
+        service_interrupt(Interrupt::TIMER, Interrupt::ADDR_TIMER);
+    } else if (interrupt_pending & Interrupt::SERIAL) {
+        service_interrupt(Interrupt::SERIAL, Interrupt::ADDR_SERIAL);
+    } else if (interrupt_pending & Interrupt::JOYPAD) {
+        service_interrupt(Interrupt::JOYPAD, Interrupt::ADDR_JOYPAD);
+    }
+}
+
+void CPU::service_interrupt(uint8_t interrupt, uint16_t addr) {
+    Logger::log_msg(std::format("handling interrupt {}", interrupt));
+    // Save PC address to stack
+    uint8_t hi = static_cast<uint8_t>((this->registers.PC & 0xFF00) >> 8);
+    uint8_t lo = static_cast<uint8_t>(this->registers.PC & 0x00FF);
+    this->stkpush(hi);
+    this->stkpush(lo);
+    this->registers.PC = addr;
+
+    // Clear flags
+    this->IME = false;
+    // Clear the specific flag bit in the IF register ($FF0F)
+    uint8_t if_reg = this->bus.read(0xFF0F);
+    this->bus.write(0xFF0F, if_reg & ~interrupt);
+    clock_cycles += 5;
+
+    // Actually service it
+}
+
+// INSTRUCTIONS 
+
 // Interrupts
 
 void CPU::di() {
-    this->IME = 0;
+    this->IME = false;
 }
 
 void CPU::ei() {
-    this->IME = 1;
+    this->IME = true;
 }
 
 // load instructions
@@ -358,9 +412,9 @@ void CPU::ld_r_hli(Reg8 r) {
 }
 
 void CPU::ld_a16_sp() {
-    uint8_t lsb_addr = this->bus.read(this->registers.PC++);
-    uint8_t msb_addr = this->bus.read(this->registers.PC++);
-    uint16_t addr = (msb_addr << 8) | lsb_addr;
+    uint8_t lo = this->bus.read(this->registers.PC++);
+    uint8_t hi = this->bus.read(this->registers.PC++);
+    uint16_t addr = (hi << 8) | lo;
 
     uint8_t lsb_sp = static_cast<uint8_t>(this->registers.SP & 0xFF);
     uint8_t msb_sp = static_cast<uint8_t>(this->registers.SP >> 8);
@@ -377,6 +431,14 @@ void CPU::ldh_a_a8() {
     this->registers.A = this->bus.read(addr);
     this->clock_cycles += 3;
 }
+
+void CPU::ld_mc_a() {
+    uint8_t a8 = this->bus.read(this->registers.PC++);
+    uint16_t addr = 0xFF00 | this->registers.C;
+    this->bus.write(addr, this->registers.A);
+    this->clock_cycles += 1;
+}
+
 
 void CPU::ldh_a8_a() {
     uint8_t a8 = this->bus.read(this->registers.PC++);
@@ -400,7 +462,7 @@ void CPU::ld_c_a() {
 void CPU::ld_a16_a() {
     uint8_t lo = this->bus.read(this->registers.PC++);
     uint8_t hi = this->bus.read(this->registers.PC++);
-    uint16_t a16 = static_cast<uint16_t>(hi << 8) | lo;
+    uint16_t a16 = (static_cast<uint16_t>(hi) << 8) | lo;
     this->bus.write(a16, this->registers.A);
     this->clock_cycles += 3;
 }
@@ -438,11 +500,6 @@ void CPU::ld_a_a16() {
 }
 
 // arithmetics
-void CPU::inc_r16(Reg16 r) {
-    this->registers.setReg16(r, this->registers.getReg16(r) + 1);
-    this-> clock_cycles += 1;
-}
-
 void CPU::inc_r16(Reg16 r) {
     this->registers.setReg16(r, this->registers.getReg16(r) + 1);
     this-> clock_cycles += 1;
@@ -532,6 +589,12 @@ void CPU::add_r8_mr(Reg8 r, Reg16 mr) {
     this->registers.setC(((uint16_t)r_val + (uint16_t)mr_val) > 0xFF);
 
     this->clock_cycles += 1;
+}
+
+void CPU::ld_mr_n8(Reg16 reg16) {
+    uint8_t n8 = this->bus.read(this->registers.PC++);
+    this->bus.write(this->registers.getReg16(Reg16::HL), n8);
+   this->clock_cycles += 1;
 }
 
 void CPU::add_r16_r16(Reg16 r1, Reg16 r2) {
@@ -1068,6 +1131,8 @@ void CPU::stop() {
 }
 
 void CPU::halt() {
+    this->halted = true;
+    this->clock_cycles++;
     // TODO: when I approach interrupts
 }
 
@@ -1164,8 +1229,11 @@ void CPU::rst(uint16_t addr) {
 }
 
 void CPU::reti() {
-    ret_cond(Cond::NONE);
     this->IME = true;
+    uint8_t lo = this->stkpop();
+    uint8_t hi = this->stkpop();
+    this->registers.PC = static_cast<uint16_t>(hi) << 8 | lo;
+    clock_cycles += 3;
 }
 
 // The result of the specific Finite State Machine (FSM) designed into the Game Boy's Sharp LR35902 (SM83) silicon.

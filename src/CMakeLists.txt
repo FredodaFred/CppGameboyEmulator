@@ -7,11 +7,19 @@ add_library(Core STATIC
     core/bus.hpp
     core/registers.cpp
     core/registers.hpp
+    core/ppu.cpp
+    core/ppu.hpp
+    
+    log/logger.hpp
+    log/logger.cpp
 )
 
 target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(GameBoyCpp
+
+    runtime/emulator.hpp
+    runtime/emulator.cpp
     runtime/main.cpp
 )
 

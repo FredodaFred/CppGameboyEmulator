@@ -1,1 +1,1 @@
-./build/src/GameBoyCpp
+./build/src/GameBoyCpp ./roms/cpu_instrs.gb --log

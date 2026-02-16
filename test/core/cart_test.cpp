@@ -7,7 +7,6 @@
 void test_load_file() {
     Cart cart;
     cart.loadFromFile("./roms/Pokemon_Red.gb");
-    cart.printHeader();
 }
 
 int main() {
