@@ -2,22 +2,24 @@
 #include <cstdint>
 #include "cart.hpp"
 #include "ppu.hpp"
+#include "../io/timer.hpp"
 
 class Bus {
     public:
-        Bus(Cart& cart, PPU& ppu);
+        Bus(Cart& cart, PPU& ppu, Timer& timer);
         uint8_t read(uint16_t addr);
         void write(uint16_t addr, uint8_t data);
 
     private:
         Cart cart;
         PPU ppu;
+        Timer timer;
 
         // Flags 
         // https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable
         uint8_t ie{0};
         uint8_t if_reg{0};
-        uint8_t serial_data[2];
+        uint8_t serial_data[2]{0};
 
         //RAM
         uint8_t WRAM[0x2000]{0};
@@ -28,7 +30,7 @@ class Bus {
         void hram_write(uint16_t addr, uint8_t data);
 
         // IO
-        void write_io(uint16_t addr);
-        uint8_t read_io(uint16_t addr, uint8_t data);
+        uint8_t read_io(uint16_t addr);
+        void write_io(uint16_t addr, uint8_t data);
 
 };

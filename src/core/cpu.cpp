@@ -9,6 +9,13 @@ CPU::CPU(Bus& bus, Registers& registers)
 
 // Executes a single instruction
 int CPU::step() {
+
+    if (IME_delay == 2) { IME_delay--;}
+    else if (IME_delay == 1) {
+        IME_delay = 0;
+        IME = true;
+    }
+
     if (this->halted) {
         // Only when IE and IF are enabled we can "unhalt"
         if ((bus.read(0xFFFF) & bus.read(0xFF0F) & 0x1F) != 0) {
@@ -23,8 +30,9 @@ int CPU::step() {
     uint8_t opcode = this->fetch();
 
     if (Logger::is_enabled()) Logger::log_cpu_state(this->registers, opcode);
-
+    this->registers.PC++;
     this->execute(opcode);
+
 
     // Here we manage the clock cycles
     int cycles_passed = this->clock_cycles;
@@ -33,8 +41,7 @@ int CPU::step() {
 }
 
 uint8_t CPU::fetch() {
-    this->clock_cycles++;
-    return bus.read(this->registers.PC++);
+    return bus.read(this->registers.PC);
 }
 
 void CPU::execute(uint8_t opcode) {
@@ -311,12 +318,13 @@ void CPU::handle_interrupts() {
 }
 
 void CPU::service_interrupt(uint8_t interrupt, uint16_t addr) {
-    Logger::log_msg(std::format("handling interrupt {}", interrupt));
+    Logger::log_msg(std::format("handling interrupt {}\n", interrupt));
     // Save PC address to stack
     uint8_t hi = static_cast<uint8_t>((this->registers.PC & 0xFF00) >> 8);
     uint8_t lo = static_cast<uint8_t>(this->registers.PC & 0x00FF);
     this->stkpush(hi);
     this->stkpush(lo);
+
     this->registers.PC = addr;
 
     // Clear flags
@@ -325,8 +333,6 @@ void CPU::service_interrupt(uint8_t interrupt, uint16_t addr) {
     uint8_t if_reg = this->bus.read(0xFF0F);
     this->bus.write(0xFF0F, if_reg & ~interrupt);
     clock_cycles += 5;
-
-    // Actually service it
 }
 
 // INSTRUCTIONS 
@@ -335,10 +341,13 @@ void CPU::service_interrupt(uint8_t interrupt, uint16_t addr) {
 
 void CPU::di() {
     this->IME = false;
+    this->IME_delay = 0;
+    this->clock_cycles += 1;
 }
 
 void CPU::ei() {
-    this->IME = true;
+    this->IME_delay = 2;
+    this->clock_cycles += 1;
 }
 
 // load instructions
@@ -422,7 +431,7 @@ void CPU::ld_a16_sp() {
     this->bus.write(addr, lsb_sp);
     this->bus.write(addr + 1, msb_sp);
 
-    this->clock_cycles += 4;
+    this->clock_cycles += 5;
 }
 
 void CPU::ldh_a_a8() {
@@ -436,7 +445,7 @@ void CPU::ld_mc_a() {
     uint8_t a8 = this->bus.read(this->registers.PC++);
     uint16_t addr = 0xFF00 | this->registers.C;
     this->bus.write(addr, this->registers.A);
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 
@@ -447,24 +456,12 @@ void CPU::ldh_a8_a() {
     this->clock_cycles += 3;
 }
 
-void CPU::ld_a_c() {
-    uint16_t addr = 0xFF00 | this->registers.C;
-    this->registers.A = this->bus.read(addr);
-    this->clock_cycles += 2;
-}
-
-void CPU::ld_c_a() {
-    uint16_t addr = 0xFF00 | this->registers.C;
-    this->bus.write(addr, this->registers.A);
-    this->clock_cycles += 2;
-}
-
 void CPU::ld_a16_a() {
     uint8_t lo = this->bus.read(this->registers.PC++);
     uint8_t hi = this->bus.read(this->registers.PC++);
     uint16_t a16 = (static_cast<uint16_t>(hi) << 8) | lo;
     this->bus.write(a16, this->registers.A);
-    this->clock_cycles += 3;
+    this->clock_cycles += 4;
 }
 
 void CPU::ld_a_mc() {
@@ -483,12 +480,12 @@ void CPU::ld_hl_sp_e8() {
     this->registers.setH(((sp & 0x0F) + (operand & 0x0F)) > 0x0F);
     this->registers.setC(((sp & 0xFF) + (operand & 0xFF)) > 0xFF);
     this->registers.setReg16(Reg16::HL, res);
-    this->clock_cycles += 2;
+    this->clock_cycles += 3;
 }
 
 void CPU::ld_sp_hl() {
     this->registers.SP = this->registers.getReg16(Reg16::HL);
-    this->clock_cycles++;
+    this->clock_cycles+=2;
 }
 
 void CPU::ld_a_a16() {
@@ -496,13 +493,13 @@ void CPU::ld_a_a16() {
     uint8_t hi = this->bus.read(this->registers.PC++);
     uint16_t addr = static_cast<uint16_t>(hi) << 8 | static_cast<uint16_t>(lo);
     this->registers.A = this->bus.read(addr);
-    this->clock_cycles += 3;
+    this->clock_cycles += 4;
 }
 
 // arithmetics
 void CPU::inc_r16(Reg16 r) {
     this->registers.setReg16(r, this->registers.getReg16(r) + 1);
-    this-> clock_cycles += 1;
+    this-> clock_cycles += 2;
 }
 
 void CPU::inc_r8(Reg8 r) {
@@ -527,7 +524,7 @@ void CPU::inc_mr(Reg16 mr) {
     this->registers.setN(false);
     this->registers.setH((old_val & 0x0F) == 0x0F);
 
-    this->clock_cycles += 2;
+    this->clock_cycles += 3;
 }
 
 void CPU::dec_r8(Reg8 r) {
@@ -545,7 +542,7 @@ void CPU::dec_r8(Reg8 r) {
 void CPU::dec_r16(Reg16 r) {
     uint16_t val = this->registers.getReg16(r);
     this->registers.setReg16(r, val - 1);
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 void CPU::dec_mr(Reg16 mr) {
@@ -558,7 +555,7 @@ void CPU::dec_mr(Reg16 mr) {
     this->registers.setN(true);
     this->registers.setH((old_val & 0x0F) == 0x00);
 
-    this->clock_cycles += 2;
+    this->clock_cycles += 3;
 }
 
 void CPU::add_r8_r8(Reg8 r1, Reg8 r2) {
@@ -571,7 +568,7 @@ void CPU::add_r8_r8(Reg8 r1, Reg8 r2) {
     this->registers.setZ(sum == 0);
     this->registers.setN(false);
     this->registers.setH(((val1 & 0x0F) + (val2 & 0x0F)) > 0x0F);
-    this->registers.setC(((uint16_t)val1 + (uint16_t)val2) > 0xFF);
+    this->registers.setC((static_cast<uint16_t>(val1) + static_cast<uint16_t>(val2)) > 0xFF);
 
     this->clock_cycles += 1;
 }
@@ -586,15 +583,15 @@ void CPU::add_r8_mr(Reg8 r, Reg16 mr) {
     this->registers.setZ(sum == 0);
     this->registers.setN(false);
     this->registers.setH(((r_val & 0x0F) + (mr_val & 0x0F)) > 0x0F);
-    this->registers.setC(((uint16_t)r_val + (uint16_t)mr_val) > 0xFF);
+    this->registers.setC((static_cast<uint16_t>(r_val) + static_cast<uint16_t>(mr_val)) > 0xFF);
 
-    this->clock_cycles += 1;
+    this->clock_cycles += 3;
 }
 
 void CPU::ld_mr_n8(Reg16 reg16) {
     uint8_t n8 = this->bus.read(this->registers.PC++);
     this->bus.write(this->registers.getReg16(Reg16::HL), n8);
-   this->clock_cycles += 1;
+   this->clock_cycles += 3;
 }
 
 void CPU::add_r16_r16(Reg16 r1, Reg16 r2) {
@@ -685,7 +682,7 @@ void CPU::adc_a_hl() {
     this->registers.setZ(this->registers.A == 0);
     this->registers.setN(false);
 
-    this->clock_cycles++;
+    this->clock_cycles += 2;
 }
 
 void CPU::sub(Reg8 r) {
@@ -730,17 +727,17 @@ void CPU::sub_hl() {
 }
 
 void CPU::sbc(Reg8 r) {
-    uint8_t cf = this->registers.getC() ? 1 : 0;
-    uint8_t a_val = this->registers.A;
-    uint8_t r_val = this->registers.getReg8(r);
-    uint8_t res = a_val - r_val - cf;
+    int a_val = this->registers.A;
+    int r_val = this->registers.getReg8(r);
+    int cf = this->registers.getC() ? 1 : 0;
+    int res = a_val - r_val - cf;
 
-    this->registers.setZ(res == 0);
+    this->registers.setZ((res & 0xFF) == 0);
     this->registers.setN(true);
-    this->registers.setH((a_val & 0x0F) < (r_val & 0x0F) + cf);
+    this->registers.setH(((a_val & 0xF) - (r_val & 0xF) - cf) < 0);
     this->registers.setC(res < 0);
 
-    this->registers.A = res;
+    this->registers.A = static_cast<uint8_t>(res);
     this->clock_cycles += 1;
 }
 
@@ -748,9 +745,9 @@ void CPU::sbc_d8() {
     uint8_t d8 = this->bus.read(this->registers.PC++);
     uint8_t cf = this->registers.getC() ? 1 : 0;
     uint8_t a_val = this->registers.A;
-    uint8_t res = a_val - d8 - cf;
+    int res = a_val - d8 - cf;
 
-    this->registers.setZ(res == 0);
+    this->registers.setZ((res & 0xFF) == 0);
     this->registers.setN(true);
     this->registers.setH((a_val & 0x0F) < (d8 & 0x0F) + cf);
     this->registers.setC(res < 0);   
@@ -761,9 +758,9 @@ void CPU::sbc_d8() {
 
 void CPU::sub_a_n8() {
     uint8_t n8 = this->bus.read(this->registers.PC++);
-    uint8_t res = this->registers.A - n8;
+    int res = this->registers.A - n8;
 
-    this->registers.setZ(res == 0);
+    this->registers.setZ((res & 0xFF) == 0);
     this->registers.setN(true);
     this->registers.setH((this->registers.A & 0x0F) < (n8 & 0x0F));
     this->registers.setC((this->registers.A < n8));
@@ -773,14 +770,14 @@ void CPU::sub_a_n8() {
 
 void CPU::sbc_a_n8() {
     uint8_t n8 = this->bus.read(this->registers.PC++);
-    uint8_t res = this->registers.A - n8 - this->registers.getC();     
+    int res = this->registers.A - n8 - this->registers.getC();
     uint8_t c = this->registers.getC();  
-    this->registers.setZ(res == 0);
+    this->registers.setZ((res & 0xFF) == 0);
     this->registers.setN(true);
     this->registers.setH((this->registers.A & 0x0F) < ((n8 & 0x0F) + c));
-    this->registers.setC(this->registers.A < 0);
+    this->registers.setC(res < 0);
     this->registers.A = res;
-    this->clock_cycles++;
+    this->clock_cycles += 2;
 }
 
 void CPU::sbc_hl() {
@@ -791,14 +788,14 @@ void CPU::sbc_hl() {
     uint16_t result = a_val - data - cf;
     uint8_t res = result & 0xFF;
 
-    registers.setZ(res == 0);
+    registers.setZ((res & 0xFF) == 0);
     registers.setN(true);
 
     registers.setH((a_val & 0xF) < ((data & 0xF) + cf));
-    registers.setC(a_val < (uint16_t)data + cf);
+    registers.setC(a_val < static_cast<uint16_t>(data) + cf);
 
     registers.A = res;
-    clock_cycles += 1;
+    clock_cycles += 2;
 }
 
 // Logic
@@ -819,7 +816,7 @@ void CPU::and_hl() {
     this->registers.setN(false);
     this->registers.setH(true);
     this->registers.setC(false);
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 
@@ -839,27 +836,17 @@ void CPU::xor_hl() {
     this->registers.setN(false);
     this->registers.setH(false);
     this->registers.setC(false);
-    this->clock_cycles += 1;
-}
-
-void CPU::xor_d8() {
-    uint8_t data = this->bus.read(this->registers.PC++);
-    this->registers.A ^= data;
-    this->registers.setZ(this->registers.A == 0);
-    this->registers.setN(false);
-    this->registers.setH(false);
-    this->registers.setC(false);
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 void CPU::xor_a_n8() {
     uint8_t n8 = this->bus.read(this->registers.PC++);
-    this->registers.A = this->registers.A ^ n8;
+    this->registers.A ^= n8;
     this->registers.setZ(this->registers.A == 0);
     this->registers.setN(false);
     this->registers.setH(false);
     this->registers.setC(false);
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 void CPU::or_r8(Reg8 r) {
@@ -881,16 +868,6 @@ void CPU::or_hl() {
     this->clock_cycles += 1;
 }
 
-void CPU::or_d8() {
-    uint8_t data = this->bus.read(this->registers.getReg16(Reg16::HL));
-    this->registers.A |= data;
-    this->registers.setZ(this->registers.A == 0);
-    this->registers.setN(false);
-    this->registers.setH(false);
-    this->registers.setC(false);
-    this->clock_cycles += 1;
-}
-
 void CPU::or_a_n8() {
     uint8_t n8 = this->bus.read(this->registers.PC++);
     this->registers.A = this->registers.A | n8;
@@ -898,7 +875,7 @@ void CPU::or_a_n8() {
     this->registers.setN(false);
     this->registers.setH(false);
     this->registers.setC(false);
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 void CPU::and_a_n8() {
@@ -909,7 +886,7 @@ void CPU::and_a_n8() {
     this->registers.setH(true);
     this->registers.setC(false);
     this->registers.A = res;
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 // Stack
@@ -919,7 +896,7 @@ void CPU::pop(Reg16 r) {
     uint8_t hi = this->stkpop();
     uint16_t data = (static_cast<uint16_t>(hi) << 8) | lo;
     this->registers.setReg16(r, data);
-    this->clock_cycles += 2;
+    this->clock_cycles += 3;
 }
 
 void CPU::push(Reg16 r) {
@@ -930,7 +907,7 @@ void CPU::push(Reg16 r) {
     this->stkpush(hi);
     this->stkpush(lo);
     
-    this->clock_cycles += 3;
+    this->clock_cycles += 4;
 }
 
 void CPU::stkpush(uint8_t data) {
@@ -957,7 +934,7 @@ void CPU::rlca() {
     this->registers.setN(false);
     this->registers.setH(false);
     this->registers.setC(c);
-    this->clock_cycles += 1;
+    this->clock_cycles++;
 }
 
 void CPU::rrca() {
@@ -1095,20 +1072,7 @@ void CPU::cp_hl() {
     this->registers.setH((a & 0x0F) < (data & 0x0F));
     this->registers.setC(a < data);
 
-    this->clock_cycles += 1;
-}
-
-void CPU::cp_d8() {
-    uint8_t data = this->bus.read(this->registers.PC++);
-    uint8_t a = this->registers.A;
-
-    // Flags logic
-    this->registers.setZ(a == data);
-    this->registers.setN(true);
-    this->registers.setH((a & 0x0F) < (data & 0x0F));
-    this->registers.setC(a < data);
-
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 void CPU::cp_a_n8() {
@@ -1119,7 +1083,7 @@ void CPU::cp_a_n8() {
     this->registers.setN(true);
     this->registers.setH((this->registers.A  & 0x0F) < (n8 & 0x0F));
     this->registers.setC(this->registers.A < n8);
-    this->clock_cycles++;
+    this->clock_cycles += 2;
 }
 
 void CPU::nop(){ this->clock_cycles++;}
@@ -1148,10 +1112,10 @@ void CPU::jr(Cond cond) {
     int8_t e8 = static_cast<int8_t>(this->bus.read(this->registers.PC++));
     if (check_cond(cond)) {
         this->registers.PC += e8;
-        this->clock_cycles += 2;
+        this->clock_cycles += 3;
         return;
     }
-    this->clock_cycles += 1;
+    this->clock_cycles += 2;
 }
 
 void CPU::jp_a16_cond(Cond cond) {
@@ -1159,18 +1123,18 @@ void CPU::jp_a16_cond(Cond cond) {
         uint8_t lo = this->bus.read(this->registers.PC++);
         uint8_t hi = this->bus.read(this->registers.PC++);
         this->registers.PC = static_cast<uint16_t>(hi) << 8 | lo;
-        clock_cycles += 3;
+        clock_cycles += 4;
         return;
     }
     this->registers.PC += 2;
-    this->clock_cycles += 2;
+    this->clock_cycles += 3;
 }
 
 void CPU::jp_a16() {
     uint8_t lo = this->bus.read(this->registers.PC++);
     uint8_t hi = this->bus.read(this->registers.PC++);
     this->registers.PC = static_cast<uint16_t>(hi) << 8 | lo;
-    clock_cycles += 3;
+    clock_cycles += 4;
     return;
 }
 
@@ -1182,14 +1146,14 @@ void CPU::jp_hl() {
 
 void CPU::ret_cond(Cond cond) {
     if(!check_cond(cond)) {
-        clock_cycles += 1;
+        clock_cycles += 2;
         return;
     }
 
     uint8_t lo = this->stkpop();
     uint8_t hi = this->stkpop();
     this->registers.PC = static_cast<uint16_t>(hi) << 8 | lo;
-    clock_cycles += 4;
+    clock_cycles += 5;
 }
 
 void CPU::call_cond_a16(Cond cond) {
@@ -1198,7 +1162,7 @@ void CPU::call_cond_a16(Cond cond) {
         return;
     }
     this->registers.PC += 2;
-    this->clock_cycles += 2;
+    this->clock_cycles += 3;
 }
 
 void CPU::call_a16() {
@@ -1208,14 +1172,14 @@ void CPU::call_a16() {
     this->bus.write(--this->registers.SP, (this->registers.PC >> 8) & 0xFF);
     this->bus.write(--this->registers.SP, this->registers.PC & 0xFF);
     this->registers.PC = addr;
-    this->clock_cycles += 5;
+    this->clock_cycles += 6;
 }
 
 void CPU::ret() {
     uint8_t lo = this->stkpop();
     uint8_t hi = this->stkpop();
     this->registers.PC = static_cast<uint16_t>(hi) << 8 | lo;
-    clock_cycles += 3;
+    clock_cycles += 4;
 }
 
 void CPU::rst(uint16_t addr) {
@@ -1225,7 +1189,7 @@ void CPU::rst(uint16_t addr) {
 
     this->registers.PC = addr;
     
-    this->clock_cycles += 3;
+    this->clock_cycles += 4;
 }
 
 void CPU::reti() {
@@ -1233,7 +1197,7 @@ void CPU::reti() {
     uint8_t lo = this->stkpop();
     uint8_t hi = this->stkpop();
     this->registers.PC = static_cast<uint16_t>(hi) << 8 | lo;
-    clock_cycles += 3;
+    clock_cycles += 4;
 }
 
 // The result of the specific Finite State Machine (FSM) designed into the Game Boy's Sharp LR35902 (SM83) silicon.
@@ -1253,102 +1217,175 @@ bool CPU::check_cond(Cond cond) {
 //CB
 void CPU::execute_cb(){
     uint8_t cb_op = this->bus.read(this->registers.PC++);
-    this->clock_cycles++;
-
     uint8_t reg_idx = cb_op & 0x07;
     uint8_t bit_idx = (cb_op >> 3) & 0x07;
     uint8_t op_type = (cb_op >> 6) & 0x03;
-
-    uint8_t val;
-    if (reg_idx == 6) {
-        val = this->bus.read(this->registers.getReg16(Reg16::HL));
-        this->clock_cycles++;
-    } else {
-        switch (reg_idx) {
-            case 0: val = this->registers.B; break;
-            case 1: val = this->registers.C; break;
-            case 2: val = this->registers.D; break;
-            case 3: val = this->registers.E; break;
-            case 4: val = this->registers.H; break;
-            case 5: val = this->registers.L; break;
-            case 7: val = this->registers.A; break;
-            default: val = 0; break;
-        }
+    switch (op_type) {
+        case(0): shift_rotate(reg_idx, bit_idx); break;
+        case(1): bit(reg_idx, bit_idx); break;
+        case(2): res(reg_idx, bit_idx); break;
+        case(3): set(reg_idx, bit_idx); break;
     }
+}
 
-    if (op_type == 1) {
-        this->registers.setZ((val & (1 << bit_idx)) == 0);
-        this->registers.setN(false);
-        this->registers.setH(true);
-        return;
-    }
+void CPU::bit(uint8_t reg_idx, uint8_t bit_idx) {
+    uint8_t val = get_cb_val(reg_idx);
+    uint8_t bit_mask = 1 << (bit_idx);
+    this->registers.setZ((val & bit_mask) == 0);
+    this->registers.setN(false);
+    this->registers.setH(true);
+    clock_cycles += 2;
+}
 
+void CPU::res(uint8_t reg_idx, uint8_t bit_idx) {
+    uint8_t bit_mask = ~(1 << (bit_idx));
+    uint8_t val = get_cb_val(reg_idx);
+    set_cb_val(reg_idx, val & bit_mask);
+    clock_cycles +=2;
+}
+
+void CPU::set(uint8_t reg_idx, uint8_t bit_idx) {
+    uint8_t bit_mask = 1 << (bit_idx);
+    uint8_t val = get_cb_val(reg_idx);
+    set_cb_val(reg_idx, val | bit_mask);
+    clock_cycles +=2;
+}
+
+void CPU::shift_rotate(uint8_t reg_idx, uint8_t bit_idx) {
+    uint8_t val = get_cb_val(reg_idx);
     uint8_t res = 0;
-    if (op_type == 2) {
-        res = val & ~(1 << bit_idx);
-    } else if (op_type == 3) {
-        res = val | (1 << bit_idx);
-    } else {
-        bool c_in = this->registers.getC();
-        switch (bit_idx) {
-            case 0: {
-                this->registers.setC((val & 0x80) != 0);
-                res = (val << 1) | (val >> 7);
-                break;
-            }
-            case 1: {
-                this->registers.setC((val & 0x01) != 0);
-                res = (val >> 1) | (val << 7);
-                break;
-            }
-            case 2: {
-                this->registers.setC((val & 0x80) != 0);
-                res = (val << 1) | (c_in ? 1 : 0);
-                break;
-            }
-            case 3: {
-                this->registers.setC((val & 0x01) != 0);
-                res = (val >> 1) | (c_in ? 0x80 : 0);
-                break;
-            }
-            case 4: {
-                this->registers.setC((val & 0x80) != 0);
-                res = val << 1;
-                break;
-            }
-            case 5: {
-                this->registers.setC((val & 0x01) != 0);
-                res = (static_cast<int8_t>(val) >> 1);
-                break;
-            }
-            case 6: {
-                this->registers.setC(false);
-                res = ((val & 0xF0) >> 4) | ((val & 0x0F) << 4);
-                break;
-            }
-            case 7: {
-                this->registers.setC((val & 0x01) != 0);
-                res = val >> 1;
-                break;
-            }
-        }
-        this->registers.setZ(res == 0);
-        this->registers.setN(false);
-        this->registers.setH(false);
-    }
 
-    if (reg_idx == 6) {
-        this->bus.write(this->registers.getReg16(Reg16::HL), res);
-        this->clock_cycles++;
-    } else {
-        switch (reg_idx) {
-            case 0: this->registers.B = res; break;
-            case 1: this->registers.C = res; break;
-            case 2: this->registers.D = res; break;
-            case 3: this->registers.E = res; break;
-            case 4: this->registers.H = res; break;
-            case 5: this->registers.L = res; break;
-            case 7: this->registers.A = res; break;
-        }
+    switch (bit_idx) {
+        case 0: res = rlc(val); break;
+        case 1: res = rrc(val); break;
+        case 2: res = rl(val);  break;
+        case 3: res = rr(val);  break;
+        case 4: res = sla(val); break;
+        case 5: res = sra(val); break;
+        case 6: res = swap(val); break;
+        case 7: res = srl(val); break;
+    }
+    set_cb_val(reg_idx, res);
+}
+
+uint8_t CPU::swap(uint8_t val) {
+    uint8_t lo = val & 0x0F;
+    uint8_t hi = val & 0xF0;
+    uint8_t res = (lo << 4) | (hi >> 4);
+    this->registers.setZ(res == 0);
+    this->registers.setN(false);
+    this->registers.setH(false);
+    this->registers.setC(false);
+    clock_cycles +=2;
+    return res;
+}
+
+uint8_t CPU::rlc(uint8_t val) {
+    uint8_t res = val << 1;
+    bool carry = (val & 0x80) != 0;
+    res |= carry;
+    this->registers.setZ(res == 0);
+    this->registers.setN(false);
+    this->registers.setH(false);
+    this->registers.setC(carry);
+    clock_cycles +=2;
+    return res;
+}
+
+uint8_t CPU::rl(uint8_t val) {
+    uint8_t old_carry = this->registers.getC() ? 1 : 0;
+    bool new_carry = (val & 0x80) != 0;
+    uint8_t res = (val << 1) | old_carry;
+    this->registers.setZ(res == 0);
+    this->registers.setN(false);
+    this->registers.setH(false);
+    this->registers.setC(new_carry);
+    clock_cycles +=2;
+    return res;
+}
+
+uint8_t CPU::rrc(uint8_t val) {
+    uint8_t res = val >> 1;
+    bool carry = (val & 0x01) != 0;
+    if (carry) res |= 0x80;
+    this->registers.setZ(res == 0);
+    this->registers.setN(false);
+    this->registers.setH(false);
+    this->registers.setC(carry);
+    clock_cycles +=2;
+    return res;
+}
+
+uint8_t CPU::rr(uint8_t val) {
+    uint8_t old_carry = this->registers.getC() ? 0x80 : 0;
+    bool new_carry = (val & 0x01) != 0;
+    uint8_t res = (val >> 1) | old_carry;
+    this->registers.setZ(res == 0);
+    this->registers.setN(false);
+    this->registers.setH(false);
+    this->registers.setC(new_carry);
+    clock_cycles +=2;
+    return res;
+}
+
+uint8_t CPU::sla(uint8_t val) {
+    uint8_t res = val << 1;
+    bool carry = (val & 0x80) != 0;
+    this->registers.setZ(res == 0);
+    this->registers.setN(false);
+    this->registers.setH(false);
+    this->registers.setC(carry);
+    clock_cycles +=2;
+    return res;
+}
+
+uint8_t CPU::sra(uint8_t val) {
+    uint8_t res = val >> 1;
+    bool carry = (val & 0x80) != 0;
+    if (carry) res |= 0x80; // MSB doesn't change.
+    this->registers.setZ(res == 0);
+    this->registers.setN(false);
+    this->registers.setH(false);
+    this->registers.setC((val & 0x01) != 0);
+    clock_cycles +=2;
+    return res;
+}
+
+uint8_t CPU::srl(uint8_t val) {
+    uint8_t res = ( val >> 1) & ~0x80; // MSB set to 0
+    this->registers.setZ(res == 0);
+    this->registers.setN(false);
+    this->registers.setH(false);
+    this->registers.setC((val & 0x01) != 0);
+    clock_cycles +=2;
+    return res;
+}
+
+// 0:B, 1:C, 2:D, 3:E, 4:H, 5:L, 6:(HL), 7:A
+uint8_t CPU::get_cb_val(uint8_t reg_idx) {
+    switch (reg_idx) {
+        case(0): return this->registers.B;
+        case(1): return this->registers.C;
+        case(2): return this->registers.D;
+        case(3): return this->registers.E;
+        case(4): return this->registers.H;
+        case(5): return this->registers.L;
+        case(6): clock_cycles++; return this->bus.read(this->registers.getReg16(Reg16::HL));
+        case(7): return this->registers.A;
+        default: throw std::runtime_error("Invalid register in CB opcode");
+    }
+}
+
+void CPU::set_cb_val(uint8_t reg_idx, uint8_t val) {
+    switch (reg_idx) {
+        case(0): this->registers.B = val; break;
+        case(1): this->registers.C = val; break;
+        case(2): this->registers.D = val; break;
+        case(3): this->registers.E = val; break;
+        case(4): this->registers.H = val; break;
+        case(5): this->registers.L = val; break;
+        case(6): clock_cycles++; this->bus.write(this->registers.getReg16(Reg16::HL), val); break;
+        case(7): this->registers.A = val; break;
+        default: throw std::runtime_error("Invalid register in CB opcode");
     }
 }

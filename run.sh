@@ -1,1 +1,11 @@
-./build/src/GameBoyCpp ./roms/cpu_instrs.gb --log
+./build/src/GameBoyCpp ./roms/01-special.gb
+./build/src/GameBoyCpp ./roms/02-interrupts.gb
+./build/src/GameBoyCpp ./roms/03.gb
+./build/src/GameBoyCpp ./roms/04.gb
+./build/src/GameBoyCpp ./roms/05.gb
+./build/src/GameBoyCpp ./roms/06-ld.gb
+./build/src/GameBoyCpp ./roms/07.gb
+./build/src/GameBoyCpp ./roms/08.gb
+./build/src/GameBoyCpp ./roms/09.gb
+./build/src/GameBoyCpp ./roms/10.gb
+./build/src/GameBoyCpp ./roms/11.gb

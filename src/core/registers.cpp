@@ -1,6 +1,6 @@
 #include "registers.hpp"
 
-// Getters 
+// Getters
 // Reminder, we are using bit masks here and converting to booleans
 bool Registers::getZ() const { return (F & 0x80) != 0; }
 bool Registers::getN() const { return (F & 0x40) != 0; }
@@ -17,16 +17,16 @@ uint8_t Registers::getReg8(Reg8 reg) const {
         case Reg8::H: return H;
         case Reg8::L: return L;
         case Reg8::F: return F;
-        default:      return 0; 
+        default:      return 0;
     }
 }
 
 uint16_t Registers::getReg16(Reg16 reg) const {
     switch (reg) {
-        case Reg16::AF: return (uint16_t)((A << 8) | F);
-        case Reg16::BC: return (uint16_t)((B << 8) | C);
-        case Reg16::DE: return (uint16_t)((D << 8) | E);
-        case Reg16::HL: return (uint16_t)((H << 8) | L);
+        case Reg16::AF: return static_cast<uint16_t>((A << 8) | F);
+        case Reg16::BC: return static_cast<uint16_t>((B << 8) | C);
+        case Reg16::DE: return static_cast<uint16_t>((D << 8) | E);
+        case Reg16::HL: return static_cast<uint16_t>((H << 8) | L);
         case Reg16::SP: return SP;
         case Reg16::PC: return PC;
     }
@@ -77,4 +77,5 @@ void Registers::reset() {
 void Registers::setBit(uint8_t bit, bool val) {
     if (val) F |= (1 << bit);
     else     F &= ~(1 << bit);
+    F &= 0xF0;
 }

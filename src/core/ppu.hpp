@@ -10,9 +10,13 @@ enum Mode {
 class PPU {
     public:
         PPU() = default;
-        void writeVRAM(uint16_t addr, uint8_t data);
-        uint8_t readVRAM(uint16_t addr);
+        void tick(int clock_cycles);
+        void write_vram(uint16_t addr, uint8_t data);
+        uint8_t read_vram(uint16_t addr);
+        void write_oam(uint16_t addr, uint8_t data);
+        uint8_t read_oam(uint16_t addr);
         Mode mode{HBLANK};
     private:
         uint8_t VRAM[8192] = {0};
+        uint8_t OAM[0x9F] = {0};
 };

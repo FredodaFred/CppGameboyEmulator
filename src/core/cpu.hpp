@@ -9,6 +9,13 @@ enum class Cond {
     NZ, NC, Z, C, NONE
 };
 
+enum class CB_OP {
+    BIT = 1,
+    RES = 2,
+    SET = 3,
+
+};
+
 class CPU {
     public:
         CPU(Bus& bus, Registers& registers);
@@ -28,6 +35,9 @@ class CPU {
          */
         bool IME{false};
         bool halted{false};
+        // Assists with one instruction delay for EI and DI
+        uint8_t IME_delay{0};
+
         
         uint8_t fetch();
         void execute(uint8_t opcode);
@@ -116,7 +126,6 @@ class CPU {
         void xor_r8(Reg8 r);
         void xor_a_n8();
         void xor_hl();
-        void xor_d8();
         void or_r8(Reg8 r);
         void or_hl();
         void or_d8();
@@ -139,7 +148,23 @@ class CPU {
         void call_cond_a16(Cond cond);
         void call_a16();
 
+        //cb instructions
         void execute_cb();
+        void bit(uint8_t reg_idx, uint8_t bit_idx);
+        void res(uint8_t reg_idx, uint8_t bit_idx);
+        void set(uint8_t reg_idx, uint8_t bit_idx);
+        void shift_rotate(uint8_t reg_idx, uint8_t bit_idx);
+        uint8_t rlc(uint8_t val);
+        uint8_t rrc(uint8_t val);
+        uint8_t rl(uint8_t val);
+        uint8_t rr(uint8_t val);
+        uint8_t sla(uint8_t val);
+        uint8_t sra(uint8_t val);
+        uint8_t swap(uint8_t val);
+        uint8_t srl(uint8_t val);
+        uint8_t get_cb_val(uint8_t reg_idx);
+        void set_cb_val(uint8_t reg_idx, uint8_t val);
+
         //helpers
         bool check_cond(Cond cond);
 

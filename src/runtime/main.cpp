@@ -34,9 +34,11 @@ int main(int argc, char* argv[]) {
     //Setup classes
     Registers registers;
     PPU ppu;
-    Bus bus(cart, ppu);
+    Timer timer;
+    Screen screen;
+    Bus bus(cart, ppu, timer);
     CPU cpu(bus, registers);
-    Emulator emulator(cpu, bus);
+    Emulator emulator(cpu, bus, timer, ppu, screen);
     
     try {
         emulator.run();
