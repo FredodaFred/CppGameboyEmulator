@@ -92,27 +92,30 @@ void Bus::hram_write(uint16_t addr, uint8_t data){
 }
 
 void Bus::write_io(uint16_t addr, uint8_t data) {
-        if (addr == 0xFF0F) {
-            if_reg = data;
-        } else if (addr == 0xFF01) {
-            serial_data[0] = data;
-            std::cout << data; //Prints for debugging / BLAARG testts
-        } else if (addr == 0xFF02) {
-            serial_data[1] = data;
-            //std::cout << data;
-        } else if (addr >= 0xFF04 && addr < 0xFF08) { //TIMER
-            timer.write_timer(addr, data);
-        }
+    if (addr == 0xFF0F) {
+        if_reg = data;
+    } else if (addr == 0xFF01) {
+        serial_data[0] = data;
+        std::cout << data; //Prints for debugging / BLAARG testts
+    } else if (addr == 0xFF02) {
+        serial_data[1] = data;
+    } else if (addr >= 0xFF04 && addr < 0xFF08) { //TIMER
+        timer.write_timer(addr, data);
+    } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
+        ppu.ppu_io_registers_write(addr, data);
+    }
 }
 
 uint8_t Bus::read_io(uint16_t addr) {
-            if (addr == 0xFF0F) {
-            return this->if_reg;
-        } else if (addr == 0xFF01) {
-            return serial_data[0];
-        } else if (addr == 0xFF02) {
-            return serial_data[1];
-        } else if (addr >= 0xFF04 && addr < 0xFF08) { //TIMER
-            this->timer.read_timer(addr);
-        }
+    if (addr == 0xFF0F) {
+        return this->if_reg;
+    } else if (addr == 0xFF01) {
+        return serial_data[0];
+    } else if (addr == 0xFF02) {
+        return serial_data[1];
+    } else if (addr >= 0xFF04 && addr < 0xFF08) { //TIMER
+        return this->timer.read_timer(addr);
+    } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
+        return this->ppu.ppu_io_read(addr);
+    }
 }

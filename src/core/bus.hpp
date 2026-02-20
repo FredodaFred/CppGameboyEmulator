@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "cart.hpp"
-#include "ppu.hpp"
+#include "../graphics/ppu.hpp"
 #include "../io/timer.hpp"
 
 class Bus {

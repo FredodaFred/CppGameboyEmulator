@@ -2,8 +2,8 @@
 #include "../core/bus.hpp"
 #include "../core/cpu.hpp"
 #include "../io/timer.hpp"
-#include "../core/ppu.hpp"
-#include "graphics/screen.hpp"
+#include "../graphics/ppu.hpp"
+#include "../graphics/screen.hpp"
 
 class Emulator {
     public:

@@ -33,9 +33,10 @@ int main(int argc, char* argv[]) {
 
     //Setup classes
     Registers registers;
-    PPU ppu;
-    Timer timer;
     Screen screen;
+    screen.init();
+    PPU ppu (screen);
+    Timer timer;
     Bus bus(cart, ppu, timer);
     CPU cpu(bus, registers);
     Emulator emulator(cpu, bus, timer, ppu, screen);

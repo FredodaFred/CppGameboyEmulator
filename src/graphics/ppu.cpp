@@ -1,0 +1,275 @@
+#include "ppu.hpp"
+
+using namespace std;
+
+PPU::PPU(Screen& screen) : screen(screen) {}
+
+// one frame 70224 dots
+void PPU::tick(int clock_cycles) {
+    dots += clock_cycles * 4;
+
+    if (LY >= 144) {
+        mode = VBLANK;
+        setSTATBit(0, true);
+        setSTATBit(1, false);
+        window_internal_line_counter = 0;
+        // Final LY value of VBLANK
+        if (LY == 154) {
+            screen.render(frame_buffer);
+            ranges::fill(frame_buffer, 0);
+            LY = 0;
+        }
+    } else {
+        if (dots < 80) {
+            if (!oam_scanned) {
+                mode = OAM_SCAN;
+                setSTATBit(0, false);
+                setSTATBit(1, true);
+                oam_scan();
+            }
+        } else if (dots < 252) {
+            if (!scanline_drawn) {
+                mode = DRAW;
+                vector<uint16_t> scanline_buffer = draw_scanline();
+                for (int i = 0; i < 20; i++) {
+                    frame_buffer[(LY*20) + i] = scanline_buffer[i];
+                }
+                setSTATBit(0, true);
+                setSTATBit(1, true);
+            }
+
+        } else {
+            if (!hblank_happened) {
+                mode = HBLANK;
+                setSTATBit(0, false);
+                setSTATBit(1, false);
+                hblank_happened = true;
+            }
+        }
+    }
+
+    // 456 means the oam_scan, draw, hblank cycle is complete.
+    if (dots >= 456) {
+        LY++;
+        dots -= 456;
+        oam_scanned = false;
+        scanline_drawn = false;
+        hblank_happened = false;
+
+    }
+    handle_stat_interrupt();
+}
+
+void PPU::oam_scan() {
+    wy_cond = (WY == LY) && window_enabled();
+    ranges::fill(sprite_buffer, 0);
+    int obj_idx = 0;
+    for (int byte = 0; byte < 160; byte += 4) {
+        uint8_t y_pos = OAM[byte];
+        uint8_t x_pos = OAM[byte+1];
+        uint8_t tile_idx = OAM[byte+2];
+        uint8_t attr_flags = OAM[byte+3];
+        int size = (LCDC & 0x04) ? 2 : 1; // 0 = 8x8, 1= 8x16
+        // LY = 0 == OAM y_pos = 16
+        bool in_range = LY + 16 >= y_pos && LY + 16 < y_pos  + 8 * size;
+        if (in_range && obj_idx != 10) {
+
+            int offset = obj_idx * 4;
+            sprite_buffer[offset] = y_pos;
+            sprite_buffer[offset+1] = x_pos;
+            sprite_buffer[offset+2] = tile_idx;
+            sprite_buffer[offset+3] = attr_flags;
+            obj_idx++;
+        }
+    }
+    oam_scanned = true;
+}
+
+vector<uint16_t> PPU::draw_scanline() {
+    // Note: Scanline (horizontal) is 160 pixels long. So each pixel_pushed increases x_pos by 1
+    int pixels_pushed = 0;
+    vector<uint16_t> scanline_buffer;
+
+    uint16_t bg_fifo = 0x0000;
+    uint16_t oam_fifo = 0x0000;
+    while (pixels_pushed < 160) {
+        bool wx_cond = WX == (pixels_pushed - 7);
+        bool window_rendering = window_enabled() && wx_cond && wy_cond;
+        uint8_t tile_id = get_tile_map_address(window_rendering, pixels_pushed);
+        uint16_t tile_data = get_tile_data(window_rendering, tile_id);
+        scanline_buffer.push_back(tile_data_to_pixels(tile_data));
+        pixels_pushed += 8;
+    }
+    scanline_drawn = true;
+    return scanline_buffer;
+}
+
+/**
+ * This returns tileId. By finding the correct tileID, we can use this id to get to the correct tile data/
+ */
+uint8_t PPU::get_tile_map_address(bool window_rendering, int pixels_pushed) {
+    bool window_tile_map = (LCDC & 0x40) != 0; // LCDC 6
+    bool bg_tile_map = ((LCDC & 0x08) != 0) ; // LCDC 3
+    uint8_t fetcherX = (pixels_pushed - (WX - 7)) / 8; // Essentially using a tile index. remember there are 32 we would pull from on a scan line.
+    uint8_t fetcherY = (LY + SCY) & 255;
+    uint8_t x_pos;
+    uint8_t y_pos;
+    uint16_t tile_map_addr;
+
+    if (window_rendering) {
+        x_pos = fetcherX;
+        y_pos = window_internal_line_counter;
+        tile_map_addr = window_tile_map ? 0x9C00 : 0x9800;
+    } else {
+        tile_map_addr = bg_tile_map ? 0x9C00 : 0x9800;
+        x_pos = ((SCX / 8) + fetcherX) & 0x1F;
+        y_pos = fetcherY;
+    }
+    uint16_t offset = (y_pos / 8) * 32 + x_pos;
+    uint8_t tile_id = read_vram(tile_map_addr + offset);
+    return tile_id;
+}
+
+//https://gbdev.io/pandocs/Tile_Data.html#vram-tile-data
+uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id) {
+    /* 0 = 8800–97FF; 1 = 8000–8FFF
+     * We are drawing at a y_pos, so we only need one row (2 bytes) from the entire tile.
+     * Therefore, we will grab the correct "index" for the row in the tile data ( think row 1 2bytes | row 2 2 byes) / sequential memory */
+
+    uint8_t row = window_rendering ? window_internal_line_counter % 8 : (LY + SCY) % 8;
+    uint16_t base;
+    if (LCDC & 0x10) {
+        base = 0x8000 + (tile_id * 16);
+    } else {
+        base = 0x9000 +  (tile_id * 16);
+    }
+    uint16_t low_tile_data = read_vram(base + row*2 ); //row*2 because its 2 bytes per index.
+    uint16_t high_tile_data = read_vram(base + 1 + row*2 );
+    uint16_t tile_data = high_tile_data << 8 | low_tile_data;
+    return tile_data;
+}
+
+/**
+ * We will convert from 2BPP form into pixel | pixel | pixel | ... form.
+ * Each pixel is 2 bits.
+ * @param tile_data
+ * @return transformed_data
+ */
+uint16_t PPU::tile_data_to_pixels(uint16_t tile_data) {
+    uint8_t low = tile_data & 0xFF;
+    uint8_t high = (tile_data >> 8) & 0xFF;
+    uint16_t pixels = 0;
+
+    for (int i = 0; i < 8; i++) {
+        uint8_t bit_idx = 7 - i;
+        uint8_t b0 = (low >> bit_idx) & 1;
+        uint8_t b1 = (high >> bit_idx) & 1;
+        uint8_t color = (b1 << 1) | b0;
+        pixels = (pixels << 2) | color;
+    }
+    return pixels;
+}
+
+
+void PPU::setSTATBit(uint8_t bit, bool val) {
+    if (val) STAT |= (1 << bit);
+    else     STAT &= ~(1 << bit);
+}
+
+// https://nnarain.github.io/2016/09/09/Gameboy-LCD-Controller.html
+// Remember, only the CPU changes bits 3,4,5,6 of STAT. Same idea as the IF register.
+void PPU::handle_stat_interrupt() {
+    // 2 flag must mirror LY == LYC, this is constantly being checked (according to pan docs)
+    setSTATBit(2, LY == LYC);
+    // Collects any valid stat interrupts
+    bool current_stat_line = ((LY == LYC) && (STAT & 0x40)) |         // LYC == LY interrupt
+                             ((mode == OAM_SCAN) && (STAT & 0x20)) |  // OAM Interrupt
+                             ((mode == VBLANK) && (STAT & 0x10)) |   // VBLANK interrupt
+                             ((mode == HBLANK) && (STAT & 0x08));    // HBLANK interrupt
+
+    if (current_stat_line && !prev_lcd_stat_interrupt) {
+        lcd_stat_interrupt = true;
+    }
+
+    prev_lcd_stat_interrupt = current_stat_line;
+}
+
+void PPU::ppu_io_registers_write(uint16_t addr, uint8_t data) {
+    switch (addr) {
+        // LCD Control and Status
+        case 0xFF40: LCDC = data; break;
+        case 0xFF41: STAT = (data & 0x78) | (STAT & 0x07);break;
+
+        // LCD Position and Scrolling
+        case 0xFF42: SCY  = data; break;
+        case 0xFF43: SCX  = data; break;
+        case 0xFF45: LYC  = data; break;
+
+        // Window Position
+        case 0xFF4A: WY   = data; break;
+        case 0xFF4B: WX   = data; break;
+
+        // LCD Palettes
+        case 0xFF47: BGP  = data; break;
+        case 0xFF48: OBP0 = data; break;
+        case 0xFF49: OBP1 = data; break;
+
+        default: break;
+    }
+}
+uint8_t PPU::ppu_io_read(uint16_t addr) {
+    switch (addr) {
+        // LCD Control and Status
+        case 0xFF40: return LCDC;
+        case 0xFF41: return STAT;
+
+        // LCD Position and Scrolling
+        case 0xFF42: return SCY;
+        case 0xFF43: return SCX;
+        case 0xFF44: return LY;
+        case 0xFF45: return LYC;
+
+        // Window Position
+        case 0xFF4A: return WY;
+        case 0xFF4B: return WX;
+
+        // LCD Palettes
+        case 0xFF47: return BGP;
+        case 0xFF48: return OBP0;
+        case 0xFF49: return OBP1;
+
+        default: break;
+    }
+}
+
+/*-------- RAM -------- */
+void PPU::write_vram(uint16_t addr, uint8_t data) {
+    if (mode == DRAW) {
+        // ignore writes while drawing to LCD screen
+        return;
+    }
+    VRAM[addr - 0x8000] = data;
+}
+
+uint8_t PPU::read_vram(uint16_t addr) {
+        if (mode == DRAW) {
+        // return garbage data if drawing to ignore
+        return 0xFF;
+    }
+    return VRAM[addr - 0x8000];
+}
+
+void PPU::write_oam(uint16_t addr, uint8_t data, bool dma) {
+    if ((mode == DRAW | mode == OAM_SCAN) && !dma) {
+        return;
+    }
+    OAM[addr - 0xFE00] = data;
+}
+
+
+uint8_t PPU::read_oam(uint16_t addr, bool dma) {
+    if ((mode == DRAW | mode == OAM_SCAN) && !dma)  {
+        return 0xFF;
+    }
+    return OAM[addr - 0xFE00];
+}

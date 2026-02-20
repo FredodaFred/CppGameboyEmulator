@@ -1,3 +1,6 @@
+set(GLAD_SRC ${CMAKE_SOURCE_DIR}/external/src/glad.c)
+set_source_files_properties(${GLAD_SRC} PROPERTIES LANGUAGE C)
+
 add_library(Core STATIC
     core/cart.cpp
     core/cart.hpp
@@ -7,19 +10,19 @@ add_library(Core STATIC
     core/bus.hpp
     core/registers.cpp
     core/registers.hpp
-    core/ppu.cpp
-    core/ppu.hpp
-    
+
     log/logger.hpp
     log/logger.cpp
 
     io/timer.cpp
     io/timer.hpp
 
+    ${GLAD_SRC}
+
     graphics/screen.cpp
     graphics/screen.hpp
-
-    ../external/src/glad.c
+    graphics/ppu.cpp
+    graphics/ppu.hpp
 )
 
 target_include_directories(Core PUBLIC
@@ -29,7 +32,6 @@ target_include_directories(Core PUBLIC
 )
 
 add_executable(GameBoyCpp
-
     runtime/emulator.hpp
     runtime/emulator.cpp
     runtime/main.cpp
@@ -38,9 +40,13 @@ add_executable(GameBoyCpp
 find_package(OpenGL REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 
+target_link_libraries(Core PUBLIC OpenGL::GL glfw)
+
 target_link_libraries(GameBoyCpp
     PRIVATE
         Core
-        OpenGL::GL
-        glfw
 )
+
+if(APPLE)
+    target_link_libraries(Core PUBLIC "-framework OpenGL" "-framework Cocoa" "-framework IOKit")
+endif()
