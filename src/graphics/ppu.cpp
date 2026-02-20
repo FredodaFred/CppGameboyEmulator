@@ -13,11 +13,15 @@ void PPU::tick(int clock_cycles) {
         setSTATBit(0, true);
         setSTATBit(1, false);
         window_internal_line_counter = 0;
+        if (LY == 144) {
+            vblank_interrupt = true;
+        }
         // Final LY value of VBLANK
         if (LY == 154) {
             screen.render(frame_buffer);
-            ranges::fill(frame_buffer, 0);
+            //ranges::fill(frame_buffer, 0);
             LY = 0;
+            vblank_interrupt = false;
         }
     } else {
         if (dots < 80) {
@@ -51,6 +55,9 @@ void PPU::tick(int clock_cycles) {
     // 456 means the oam_scan, draw, hblank cycle is complete.
     if (dots >= 456) {
         LY++;
+        if (window_enabled()) {
+            window_internal_line_counter++;
+        }
         dots -= 456;
         oam_scanned = false;
         scanline_drawn = false;
@@ -90,13 +97,12 @@ vector<uint16_t> PPU::draw_scanline() {
     int pixels_pushed = 0;
     vector<uint16_t> scanline_buffer;
 
-    uint16_t bg_fifo = 0x0000;
-    uint16_t oam_fifo = 0x0000;
     while (pixels_pushed < 160) {
         bool wx_cond = WX == (pixels_pushed - 7);
         bool window_rendering = window_enabled() && wx_cond && wy_cond;
+
         uint8_t tile_id = get_tile_map_address(window_rendering, pixels_pushed);
-        uint16_t tile_data = get_tile_data(window_rendering, tile_id);
+        uint16_t tile_data = get_tile_data(window_rendering, tile_id, pixels_pushed);
         scanline_buffer.push_back(tile_data_to_pixels(tile_data));
         pixels_pushed += 8;
     }
@@ -110,28 +116,30 @@ vector<uint16_t> PPU::draw_scanline() {
 uint8_t PPU::get_tile_map_address(bool window_rendering, int pixels_pushed) {
     bool window_tile_map = (LCDC & 0x40) != 0; // LCDC 6
     bool bg_tile_map = ((LCDC & 0x08) != 0) ; // LCDC 3
-    uint8_t fetcherX = (pixels_pushed - (WX - 7)) / 8; // Essentially using a tile index. remember there are 32 we would pull from on a scan line.
-    uint8_t fetcherY = (LY + SCY) & 255;
     uint8_t x_pos;
     uint8_t y_pos;
     uint16_t tile_map_addr;
 
     if (window_rendering) {
-        x_pos = fetcherX;
+        int window_x = pixels_pushed - (WX - 7);
+        if (window_x < 0) x_pos = 0; else x_pos = pixels_pushed - (WX - 7);
         y_pos = window_internal_line_counter;
         tile_map_addr = window_tile_map ? 0x9C00 : 0x9800;
     } else {
+        // TODO: At the very beginning of Mode 3, rendering is paused for SCX % 8 dots while the same number of pixels are discarded from the leftmost tile
+        int discard = SCX % 8;
         tile_map_addr = bg_tile_map ? 0x9C00 : 0x9800;
-        x_pos = ((SCX / 8) + fetcherX) & 0x1F;
-        y_pos = fetcherY;
+        x_pos = ((SCX + pixels_pushed) / 8) & 0x1F;
+        y_pos = (LY + SCY) & 255;
     }
-    uint16_t offset = (y_pos / 8) * 32 + x_pos;
-    uint8_t tile_id = read_vram(tile_map_addr + offset);
-    return tile_id;
+    uint16_t offset = ((y_pos / 8) * 32 )+ x_pos;
+    uint16_t addr = tile_map_addr + offset;
+    // std::cout << format("{:02X}", read_vram_internal(addr)) << endl;
+    return read_vram_internal(addr);
 }
 
 //https://gbdev.io/pandocs/Tile_Data.html#vram-tile-data
-uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id) {
+uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id, int pixels_pushed) {
     /* 0 = 8800–97FF; 1 = 8000–8FFF
      * We are drawing at a y_pos, so we only need one row (2 bytes) from the entire tile.
      * Therefore, we will grab the correct "index" for the row in the tile data ( think row 1 2bytes | row 2 2 byes) / sequential memory */
@@ -141,23 +149,44 @@ uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id) {
     if (LCDC & 0x10) {
         base = 0x8000 + (tile_id * 16);
     } else {
-        base = 0x9000 +  (tile_id * 16);
+        int8_t signed_tile_id = static_cast<int8_t>(tile_id);
+        base = 0x9000 +  (signed_tile_id * 16);
     }
-    uint16_t low_tile_data = read_vram(base + row*2 ); //row*2 because its 2 bytes per index.
-    uint16_t high_tile_data = read_vram(base + 1 + row*2 );
+    uint16_t low_tile_data = read_vram_internal(base + row*2 ); //row*2 because its 2 bytes per index.
+    uint16_t high_tile_data = read_vram_internal(base + 1 + row*2 );
     uint16_t tile_data = high_tile_data << 8 | low_tile_data;
-    return tile_data;
+
+    //int x = ppu_get_context()->pfc.fetch_x - (8 - (lcd_get_context()->scroll_x % 8));
+    //int x =
+    uint8_t low = static_cast<uint8_t>(tile_data & 0x00FF); // Low is at the bottom
+    uint8_t high = static_cast<uint8_t>((tile_data & 0xFF00) >> 8); // High is at the top
+    uint16_t pixels = 0;
+
+    for (int i = 0; i < 8; i++) {
+        uint8_t bit_idx = 7 - i;
+        uint8_t b0 = (low >> bit_idx) & 1;
+        uint8_t b1 = (high >> bit_idx) & 1;
+        uint8_t color = (b1 << 1) | b0;
+        pixels = (pixels << 2) | color;
+    }
+    return pixels;
+
+
+    //return tile_data;
 }
 
 /**
  * We will convert from 2BPP form into pixel | pixel | pixel | ... form.
  * Each pixel is 2 bits.
+ *
+ * first byte specifies the least significant bit of the color ID
+ * second byte specifies the most significant bit
  * @param tile_data
  * @return transformed_data
  */
 uint16_t PPU::tile_data_to_pixels(uint16_t tile_data) {
-    uint8_t low = tile_data & 0xFF;
-    uint8_t high = (tile_data >> 8) & 0xFF;
+    uint8_t low = static_cast<uint8_t>(tile_data & 0x00FF); // Low is at the bottom
+    uint8_t high = static_cast<uint8_t>((tile_data & 0xFF00) >> 8); // High is at the top
     uint16_t pixels = 0;
 
     for (int i = 0; i < 8; i++) {
@@ -238,7 +267,7 @@ uint8_t PPU::ppu_io_read(uint16_t addr) {
         case 0xFF48: return OBP0;
         case 0xFF49: return OBP1;
 
-        default: break;
+        default: return 0xFF;
     }
 }
 
@@ -256,6 +285,10 @@ uint8_t PPU::read_vram(uint16_t addr) {
         // return garbage data if drawing to ignore
         return 0xFF;
     }
+    return VRAM[addr - 0x8000];
+}
+
+uint8_t PPU::read_vram_internal(uint16_t addr) {
     return VRAM[addr - 0x8000];
 }
 

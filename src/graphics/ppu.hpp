@@ -15,9 +15,11 @@ class PPU {
         void tick(int clock_cycles);
         void write_vram(uint16_t addr, uint8_t data);
         uint8_t read_vram(uint16_t addr);
+
         void write_oam(uint16_t addr, uint8_t data, bool dma = false);
         uint8_t read_oam(uint16_t addr, bool dma = false);
         Mode mode{OAM_SCAN};
+        bool vblank_interrupt{false};
 
         void ppu_io_registers_write(uint16_t addr, uint8_t data);
         uint8_t ppu_io_read(uint16_t addr);
@@ -37,6 +39,7 @@ class PPU {
         void oam_scan();
 
         uint16_t draw_buffer();
+        uint8_t read_vram_internal(uint16_t addr);
 
         std::vector<unsigned short> draw_scanline();
 
@@ -76,6 +79,6 @@ class PPU {
         bool wy_cond{false};
 
         uint8_t get_tile_map_address(bool window_rendering, int pixels_pushed);
-        uint16_t get_tile_data(bool window_rendering, uint8_t tile_id);
+        uint16_t get_tile_data(bool window_rendering, uint8_t tile_id, int pixels_pushed);
         uint16_t tile_data_to_pixels(uint16_t tile_data);
 };

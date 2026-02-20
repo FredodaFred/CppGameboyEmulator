@@ -19,6 +19,11 @@ void Emulator::tick() {
         bus.write(0xFF0f, if_val | Interrupt::TIMER);
     }
 
+    if (ppu.vblank_interrupt) {
+        uint8_t if_val = bus.read(0xFF0F);
+        bus.write(0xFF0f, if_val | Interrupt::VBLANK);
+    }
+
     if (ppu.lcd_stat_interrupt != ppu.prev_lcd_stat_interrupt && ppu.lcd_stat_interrupt) {
         uint8_t if_val = bus.read(0xFF0F);
         bus.write(0xFF0f, if_val | Interrupt::LCD_STAT);

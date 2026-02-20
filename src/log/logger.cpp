@@ -11,7 +11,7 @@ int Logger::lines_since_flush = 0;
 // TODO: wrap execution of logging functions so that same logic is repeated before and after execution
 // Yes we aren't controlling flushing outside of log_cpu_state, but functionally we don't need to 
 
-void Logger::open(const std::string& filename) {
+void Logger::open(const string& filename) {
     file_stream.open(filename);
 }
 
@@ -22,7 +22,7 @@ void Logger::close() {
     }
 }
 
-void Logger::log_msg(const string & msg){
+void Logger::log_msg(const string& msg){
     if (!enabled || !file_stream.is_open()) return;
     file_stream << msg;
 }

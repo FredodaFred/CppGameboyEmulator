@@ -29,12 +29,12 @@ uint8_t Bus::read(uint16_t addr){
     } else if (addr < 0xFE00) {
         // echo ram
     } else if (addr < 0xFEA0) {
-        // OAM
+        ppu.read_oam(addr);
     }  else if (addr < 0xFF00) {
         // unuseable
+        return 0x00;
     } else if (addr < 0xFF80) {  // IO registers
        read_io(addr);
-
     } else if (addr < 0xFFFF) {
         return hram_read(addr);
     } else if (addr == 0xFFFF) {
@@ -45,7 +45,6 @@ uint8_t Bus::read(uint16_t addr){
 }
 
 void Bus::write(uint16_t addr, uint8_t data){
-
     if(addr < 0x8000) {
         cart.write(addr, data); 
     } else if (addr < 0xA000) {
@@ -56,10 +55,12 @@ void Bus::write(uint16_t addr, uint8_t data){
         wram_write(addr, data);
     } else if (addr < 0xFE00) {
         // echo ram
+        return;
     } else if (addr < 0xFEA0) {
-        // OAM
+        ppu.write_oam(addr, data);
     }  else if (addr < 0xFF00) {
         // unuseable
+        return;
     } else if (addr < 0xFF80) {
         write_io(addr, data);
     } else if (addr < 0xFFFF) {
@@ -69,6 +70,7 @@ void Bus::write(uint16_t addr, uint8_t data){
     } else {
         throw std::runtime_error("Invalid Memory Address");
     }
+
 }
 
 uint8_t Bus::wram_read(uint16_t addr){

@@ -10,11 +10,11 @@ class Emulator {
         Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen);
         void run();
     private:
-        CPU cpu;
-        Bus bus;
-        Timer timer;
-        PPU ppu;
-        Screen screen;
+        CPU& cpu;
+        Bus& bus;
+        Timer& timer;
+        PPU& ppu;
+        Screen& screen;
 
         void tick();
 

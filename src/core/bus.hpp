@@ -11,9 +11,9 @@ class Bus {
         void write(uint16_t addr, uint8_t data);
 
     private:
-        Cart cart;
-        PPU ppu;
-        Timer timer;
+        Cart& cart;
+        PPU& ppu;
+        Timer& timer;
 
         // Flags 
         // https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable

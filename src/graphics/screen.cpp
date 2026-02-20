@@ -32,7 +32,7 @@ void Screen::render(const uint16_t* frame_buffer) {
         // unpack a single 8bit sequence
         for (int j = 0; j < 8; j++) {
             uint8_t pixel = pixels8 >> 14;
-            pixels8 = pixels8 << 2; // so the previous line works, we make the next "pixel" the MSB
+            pixels8 <<= 2; // so the previous line works, we make the next "pixel" the MSB
             draw_pixel_to_buffer(curr_pixels, curr_pixels_index, pixel);
             curr_pixels_index += 3; // 1 pixel is 3 bytes
 
