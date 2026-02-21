@@ -18,7 +18,7 @@ void PPU::tick(int clock_cycles) {
         }
         // Final LY value of VBLANK
         if (LY == 154) {
-            screen.render(frame_buffer);
+            screen.render(frame_buffer, FRAME_BUFFER_SIZE);
             //ranges::fill(frame_buffer, 0);
             LY = 0;
             vblank_interrupt = false;
@@ -34,14 +34,10 @@ void PPU::tick(int clock_cycles) {
         } else if (dots < 252) {
             if (!scanline_drawn) {
                 mode = DRAW;
-                vector<uint16_t> scanline_buffer = draw_scanline();
-                for (int i = 0; i < 20; i++) {
-                    frame_buffer[(LY*20) + i] = scanline_buffer[i];
-                }
+                draw_scanline();
                 setSTATBit(0, true);
                 setSTATBit(1, true);
             }
-
         } else {
             if (!hblank_happened) {
                 mode = HBLANK;
@@ -62,7 +58,6 @@ void PPU::tick(int clock_cycles) {
         oam_scanned = false;
         scanline_drawn = false;
         hblank_happened = false;
-
     }
     handle_stat_interrupt();
 }
@@ -77,7 +72,6 @@ void PPU::oam_scan() {
         uint8_t tile_idx = OAM[byte+2];
         uint8_t attr_flags = OAM[byte+3];
         int size = (LCDC & 0x04) ? 2 : 1; // 0 = 8x8, 1= 8x16
-        // LY = 0 == OAM y_pos = 16
         bool in_range = LY + 16 >= y_pos && LY + 16 < y_pos  + 8 * size;
         if (in_range && obj_idx != 10) {
 
@@ -92,28 +86,23 @@ void PPU::oam_scan() {
     oam_scanned = true;
 }
 
-vector<uint16_t> PPU::draw_scanline() {
+void PPU::draw_scanline() {
     // Note: Scanline (horizontal) is 160 pixels long. So each pixel_pushed increases x_pos by 1
-    int pixels_pushed = 0;
-    vector<uint16_t> scanline_buffer;
-
-    while (pixels_pushed < 160) {
+    while (pixels_pushed - (SCX % 8) < 160) {
         bool wx_cond = WX == (pixels_pushed - 7);
         bool window_rendering = window_enabled() && wx_cond && wy_cond;
-
-        uint8_t tile_id = get_tile_map_address(window_rendering, pixels_pushed);
-        uint16_t tile_data = get_tile_data(window_rendering, tile_id, pixels_pushed);
-        scanline_buffer.push_back(tile_data_to_pixels(tile_data));
-        pixels_pushed += 8;
+        uint8_t tile_id = get_tile_map_address(window_rendering);
+        uint16_t tile_data = get_tile_data(window_rendering, tile_id);
+        tile_data_to_pixels(tile_data);
     }
     scanline_drawn = true;
-    return scanline_buffer;
+    pixels_pushed = 0;
 }
 
 /**
  * This returns tileId. By finding the correct tileID, we can use this id to get to the correct tile data/
  */
-uint8_t PPU::get_tile_map_address(bool window_rendering, int pixels_pushed) {
+uint8_t PPU::get_tile_map_address(bool window_rendering) {
     bool window_tile_map = (LCDC & 0x40) != 0; // LCDC 6
     bool bg_tile_map = ((LCDC & 0x08) != 0) ; // LCDC 3
     uint8_t x_pos;
@@ -126,20 +115,18 @@ uint8_t PPU::get_tile_map_address(bool window_rendering, int pixels_pushed) {
         y_pos = window_internal_line_counter;
         tile_map_addr = window_tile_map ? 0x9C00 : 0x9800;
     } else {
-        // TODO: At the very beginning of Mode 3, rendering is paused for SCX % 8 dots while the same number of pixels are discarded from the leftmost tile
-        int discard = SCX % 8;
         tile_map_addr = bg_tile_map ? 0x9C00 : 0x9800;
         x_pos = ((SCX + pixels_pushed) / 8) & 0x1F;
+        //std::cout << format("X Pos: {:02X}", x_pos) << std::endl;
         y_pos = (LY + SCY) & 255;
     }
-    uint16_t offset = ((y_pos / 8) * 32 )+ x_pos;
+    uint16_t offset = ((y_pos / 8) * 32 ) + x_pos;
     uint16_t addr = tile_map_addr + offset;
-    // std::cout << format("{:02X}", read_vram_internal(addr)) << endl;
     return read_vram_internal(addr);
 }
 
 //https://gbdev.io/pandocs/Tile_Data.html#vram-tile-data
-uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id, int pixels_pushed) {
+uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id) {
     /* 0 = 8800–97FF; 1 = 8000–8FFF
      * We are drawing at a y_pos, so we only need one row (2 bytes) from the entire tile.
      * Therefore, we will grab the correct "index" for the row in the tile data ( think row 1 2bytes | row 2 2 byes) / sequential memory */
@@ -155,48 +142,38 @@ uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id, int pixels_p
     uint16_t low_tile_data = read_vram_internal(base + row*2 ); //row*2 because its 2 bytes per index.
     uint16_t high_tile_data = read_vram_internal(base + 1 + row*2 );
     uint16_t tile_data = high_tile_data << 8 | low_tile_data;
-
-    //int x = ppu_get_context()->pfc.fetch_x - (8 - (lcd_get_context()->scroll_x % 8));
-    //int x =
-    uint8_t low = static_cast<uint8_t>(tile_data & 0x00FF); // Low is at the bottom
-    uint8_t high = static_cast<uint8_t>((tile_data & 0xFF00) >> 8); // High is at the top
-    uint16_t pixels = 0;
-
-    for (int i = 0; i < 8; i++) {
-        uint8_t bit_idx = 7 - i;
-        uint8_t b0 = (low >> bit_idx) & 1;
-        uint8_t b1 = (high >> bit_idx) & 1;
-        uint8_t color = (b1 << 1) | b0;
-        pixels = (pixels << 2) | color;
-    }
-    return pixels;
-
-
-    //return tile_data;
+    return tile_data;
 }
 
 /**
  * We will convert from 2BPP form into pixel | pixel | pixel | ... form.
  * Each pixel is 2 bits.
+ * Once transformed, we can evaluate each pixel and push it directly to the frame_buffer
  *
  * first byte specifies the least significant bit of the color ID
  * second byte specifies the most significant bit
+ *
+ *
  * @param tile_data
  * @return transformed_data
  */
-uint16_t PPU::tile_data_to_pixels(uint16_t tile_data) {
+void PPU::tile_data_to_pixels(uint16_t tile_data) {
     uint8_t low = static_cast<uint8_t>(tile_data & 0x00FF); // Low is at the bottom
     uint8_t high = static_cast<uint8_t>((tile_data & 0xFF00) >> 8); // High is at the top
-    uint16_t pixels = 0;
-
     for (int i = 0; i < 8; i++) {
         uint8_t bit_idx = 7 - i;
         uint8_t b0 = (low >> bit_idx) & 1;
         uint8_t b1 = (high >> bit_idx) & 1;
-        uint8_t color = (b1 << 1) | b0;
-        pixels = (pixels << 2) | color;
+        uint8_t pixel = (b1 << 1) | b0;
+
+        int screen_x = pixels_pushed - (SCX % 8);
+        // Only write to the buffer if the pixel is actually visible on screen
+        if (screen_x >= 0 && screen_x < 160) {
+            int buffer_index = (LY * 160) + screen_x;
+            frame_buffer[buffer_index] = pixel;
+        }
+        pixels_pushed++;
     }
-    return pixels;
 }
 
 
@@ -273,18 +250,18 @@ uint8_t PPU::ppu_io_read(uint16_t addr) {
 
 /*-------- RAM -------- */
 void PPU::write_vram(uint16_t addr, uint8_t data) {
-    if (mode == DRAW) {
-        // ignore writes while drawing to LCD screen
-        return;
-    }
+    // if (mode == DRAW) {
+    //     // ignore writes while drawing to LCD screen
+    //     return;
+    // }
     VRAM[addr - 0x8000] = data;
 }
 
 uint8_t PPU::read_vram(uint16_t addr) {
-        if (mode == DRAW) {
-        // return garbage data if drawing to ignore
-        return 0xFF;
-    }
+    //     if (mode == DRAW) {
+    //     // return garbage data if drawing to ignore
+    //     return 0xFF;
+    // }
     return VRAM[addr - 0x8000];
 }
 

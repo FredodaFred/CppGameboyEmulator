@@ -9,13 +9,6 @@ CPU::CPU(Bus& bus, Registers& registers)
 
 // Executes a single instruction
 int CPU::step() {
-
-    if (IME_delay == 2) { IME_delay--;}
-    else if (IME_delay == 1) {
-        IME_delay = 0;
-        IME = true;
-    }
-
     if (this->halted) {
         // Only when IE and IF are enabled we can "unhalt"
         if ((bus.read(0xFFFF) & bus.read(0xFF0F) & 0x1F) != 0) {
@@ -25,14 +18,21 @@ int CPU::step() {
         clock_cycles++;
         return clock_cycles;
     }
-    handle_interrupts();
 
-    uint8_t opcode = this->fetch();
+    if (IME_delay == 2) { IME_delay--;}
+    else if (IME_delay == 1) {
+        IME_delay = 0;
+        IME = true;
+    }
 
-    if (Logger::is_enabled()) Logger::log_cpu_state(this->registers, opcode);
-    this->registers.PC++;
-    this->execute(opcode);
+    bool interrupt_handled = handle_interrupts();
 
+    if (!interrupt_handled) {
+        uint8_t opcode = this->fetch();
+        if (Logger::is_enabled()) Logger::log_cpu_state(this->registers, opcode);
+        this->registers.PC++;
+        this->execute(opcode);
+    }
 
     // Here we manage the clock cycles
     int cycles_passed = this->clock_cycles;
@@ -297,11 +297,16 @@ void CPU::execute(uint8_t opcode) {
     }
 }
 
-void CPU::handle_interrupts() {
-    if (!this->IME) return;
+bool CPU::handle_interrupts() {
+    if (!this->IME) return false;
     // NOTE: 0xFFFF is IE and 0xFF0F is IF
-    uint8_t interrupt_pending = this->bus.read(0xFFFF) & this->bus.read(0xFF0F);
-    if (interrupt_pending == 0) return;
+    uint8_t IE = this->bus.read(0xFFFF);
+    uint8_t IF = this->bus.read(0xFF0F);
+    uint8_t interrupt_pending = IE & IF;
+    // uint8_t IF_2 = this->bus.read(0xFF0F);
+    // std::cout << std::format("IF: 0x{:02X}\n", IF_2);
+
+    if (interrupt_pending == 0) return false;
 
     // Priority check
     if (interrupt_pending & Interrupt::VBLANK) {
@@ -315,6 +320,7 @@ void CPU::handle_interrupts() {
     } else if (interrupt_pending & Interrupt::JOYPAD) {
         service_interrupt(Interrupt::JOYPAD, Interrupt::ADDR_JOYPAD);
     }
+    return true;
 }
 
 void CPU::service_interrupt(uint8_t interrupt, uint16_t addr) {
@@ -326,16 +332,15 @@ void CPU::service_interrupt(uint8_t interrupt, uint16_t addr) {
     this->stkpush(lo);
 
     this->registers.PC = addr;
-
     // Clear flags
-    this->IME = false;
-    // Clear the specific flag bit in the IF register ($FF0F)
     uint8_t if_reg = this->bus.read(0xFF0F);
     this->bus.write(0xFF0F, if_reg & ~interrupt);
+    this->IME = false;
+    this->halted = false;
     clock_cycles += 5;
 }
 
-// INSTRUCTIONS 
+// INSTRUCTIONS
 
 // Interrupts
 
@@ -1078,7 +1083,6 @@ void CPU::cp_hl() {
 void CPU::cp_a_n8() {
     uint8_t n8 = this->bus.read(this->registers.PC++);
     uint8_t res = this->registers.A - n8;
-
     this->registers.setZ(res == 0);
     this->registers.setN(true);
     this->registers.setH((this->registers.A  & 0x0F) < (n8 & 0x0F));

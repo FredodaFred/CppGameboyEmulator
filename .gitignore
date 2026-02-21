@@ -1,3 +1,4 @@
 /build
 /roms
 cpu_trace.log
+vram_dump.txt

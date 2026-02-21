@@ -12,9 +12,8 @@ class Screen {
         Screen() = default;
         void init();
         void close();
-        void render(const uint16_t *buffer);
+        void render(const uint8_t *frame_buffer, int size);
         void tick();
-        static constexpr int FRAME_BUFFER_SIZE{(160/8)* 144}; // TODO: centralize between PPU and Screen
 
     private:
         GLFWwindow* window;

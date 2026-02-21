@@ -42,6 +42,17 @@ void Logger::log_cpu_state(Registers& registers, uint8_t opcode) {
     }
 }
 
+void Logger::vram_dump(const uint8_t* VRAM) {
+    file_stream.open("vram_dump.txt");
+    file_stream.clear();
+    for (int i = 0; i < 8192; i++) {
+        file_stream << format("{:02X} ", VRAM[i]);
+        if (i % 16 == 0) file_stream << endl;
+    }
+    file_stream << VRAM;
+    file_stream.close();
+}
+
 void Logger::log_cart_header(Cart& cart) {
     if (!cart.cart_loaded) return;
     if (!enabled || !file_stream.is_open()) return;

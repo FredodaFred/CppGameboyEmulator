@@ -14,6 +14,9 @@
 class Logger {
     public:
         static void log_cpu_state(Registers& registers, uint8_t opcode);
+
+        static void vram_dump(const uint8_t *VRAM);
+
         static void log_cart_header(Cart& cart);
         static void open(const std::string& filename);
         static void log_msg(const std::string & msg);

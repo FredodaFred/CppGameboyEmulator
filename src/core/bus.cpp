@@ -33,12 +33,16 @@ uint8_t Bus::read(uint16_t addr){
     }  else if (addr < 0xFF00) {
         // unuseable
         return 0x00;
-    } else if (addr < 0xFF80) {  // IO registers
+    } else if (addr < 0xFF80) {
+        // IO registers
+        if (addr == 0xFF0F) {
+            return IF;
+        }
        read_io(addr);
     } else if (addr < 0xFFFF) {
         return hram_read(addr);
     } else if (addr == 0xFFFF) {
-        return ie;
+        return IE;
     } else {
         throw std::runtime_error("Invalid Memory Address");
     }
@@ -62,11 +66,14 @@ void Bus::write(uint16_t addr, uint8_t data){
         // unuseable
         return;
     } else if (addr < 0xFF80) {
+        if (addr == 0xFF0F) {
+            IF = data;
+        }
         write_io(addr, data);
     } else if (addr < 0xFFFF) {
         hram_write(addr, data);
     } else if (addr == 0xFFFF) {
-        ie = data;
+        IE = data;
     } else {
         throw std::runtime_error("Invalid Memory Address");
     }
@@ -94,9 +101,7 @@ void Bus::hram_write(uint16_t addr, uint8_t data){
 }
 
 void Bus::write_io(uint16_t addr, uint8_t data) {
-    if (addr == 0xFF0F) {
-        if_reg = data;
-    } else if (addr == 0xFF01) {
+   if (addr == 0xFF01) {
         serial_data[0] = data;
         std::cout << data; //Prints for debugging / BLAARG testts
     } else if (addr == 0xFF02) {
@@ -109,9 +114,7 @@ void Bus::write_io(uint16_t addr, uint8_t data) {
 }
 
 uint8_t Bus::read_io(uint16_t addr) {
-    if (addr == 0xFF0F) {
-        return this->if_reg;
-    } else if (addr == 0xFF01) {
+     if (addr == 0xFF01) {
         return serial_data[0];
     } else if (addr == 0xFF02) {
         return serial_data[1];

@@ -41,7 +41,8 @@ class CPU {
         
         uint8_t fetch();
         void execute(uint8_t opcode);
-        void handle_interrupts();
+
+        bool handle_interrupts();
         void service_interrupt(uint8_t interrupt, uint16_t addr);
 
         // opcode executors

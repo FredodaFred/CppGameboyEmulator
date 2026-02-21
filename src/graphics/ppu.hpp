@@ -25,9 +25,7 @@ class PPU {
         uint8_t ppu_io_read(uint16_t addr);
         bool lcd_stat_interrupt{false};
         bool prev_lcd_stat_interrupt{false};
-        static constexpr int FRAME_BUFFER_SIZE{(160/8)* 144};
-
-
+        static constexpr int FRAME_BUFFER_SIZE{160*144};
     private:
         Screen& screen;
 
@@ -41,7 +39,7 @@ class PPU {
         uint16_t draw_buffer();
         uint8_t read_vram_internal(uint16_t addr);
 
-        std::vector<unsigned short> draw_scanline();
+        void draw_scanline();
 
         bool oam_scanned{false};
         bool scanline_drawn{false};
@@ -51,8 +49,8 @@ class PPU {
         void handle_stat_interrupt();
 
         /* ----- RAM ----- */
-        uint8_t VRAM[8192] = {};
         uint8_t OAM[0x9F] = {};
+        uint8_t VRAM[8192] = {};
 
         /* ----- PPU Registers ----- */
         // We initialize them to what's after the powerup sequence
@@ -73,12 +71,12 @@ class PPU {
         inline bool window_enabled() const {return (LCDC & 0x20) != 0;}
 
         /* ------- Pixel FIFO ---- */
-        uint16_t frame_buffer[FRAME_BUFFER_SIZE];             // 20 tiles by # of rows
-        //std::vector<uint8_t> bg_fifo;
-        std::vector<uint8_t> oam_fifo;
+        uint8_t frame_buffer[FRAME_BUFFER_SIZE]; // 20 tiles by # of rows
+        int pixels_pushed = 0;
         bool wy_cond{false};
 
-        uint8_t get_tile_map_address(bool window_rendering, int pixels_pushed);
-        uint16_t get_tile_data(bool window_rendering, uint8_t tile_id, int pixels_pushed);
-        uint16_t tile_data_to_pixels(uint16_t tile_data);
+        uint8_t get_tile_map_address(bool window_rendering);
+        uint16_t get_tile_data(bool window_rendering, uint8_t tile_id);
+
+        void tile_data_to_pixels(uint16_t tile_data);
 };

@@ -11,7 +11,8 @@ void Screen::tick() {
  *
  */
 
-void Screen::render(const uint16_t* frame_buffer) {
+void Screen::render(const uint8_t* frame_buffer, const int size) {
+    glfwMakeContextCurrent(window);
     // "summon" the PBO and it's stored pixels
     if (pbo_id == 0) {
         std::cerr << "Error: PBO ID is 0. Did init() run?" << std::endl;
@@ -27,18 +28,12 @@ void Screen::render(const uint16_t* frame_buffer) {
     int curr_pixels_index = 0;
 
     // i is 8 pixels,
-    for (int i = 0; i < FRAME_BUFFER_SIZE; i++) {
-        uint16_t pixels8 = frame_buffer[i];
-        // unpack a single 8bit sequence
-        for (int j = 0; j < 8; j++) {
-            uint8_t pixel = pixels8 >> 14;
-            pixels8 <<= 2; // so the previous line works, we make the next "pixel" the MSB
-            draw_pixel_to_buffer(curr_pixels, curr_pixels_index, pixel);
-            curr_pixels_index += 3; // 1 pixel is 3 bytes
-
-        }
-
+    for (int i = 0; i < size; i++) {
+        uint8_t pixel = frame_buffer[i];
+        draw_pixel_to_buffer(curr_pixels, curr_pixels_index, pixel);
+        curr_pixels_index += 3;
     }
+
     glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 
     // 1. Clear the screen

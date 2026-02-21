@@ -4,6 +4,7 @@
 #include "../core/cpu.hpp"
 #include "../core/registers.hpp"
 #include "emulator.hpp"
+#include "graphics/dbg_window.hpp"
 
 Cart loadCart(std::string romPath) {
     Cart cart;
@@ -15,17 +16,21 @@ Cart loadCart(std::string romPath) {
     return cart;
 }
 
+
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: ./emulator <rom_path>" << std::endl;
         return 1; 
     }
     std::string romPath = argv[1];
+    bool enable_logging = std::find(argv, argv + argc, std::string_view("--log")) != (argv + argc);
+    bool enable_dbg_window = std::find(argv, argv + argc, std::string_view("--dbg")) != (argv + argc);
 
-    if (argc >= 3 && std::string_view(argv[2]) == "--log") {
+    if (enable_logging) {
         Logger::open("cpu_trace.log");
         Logger::set_enabled(true);
     }
+
 
     // Load game
     Cart cart = loadCart(romPath);
@@ -39,7 +44,12 @@ int main(int argc, char* argv[]) {
     Timer timer;
     Bus bus(cart, ppu, timer);
     CPU cpu(bus, registers);
-    Emulator emulator(cpu, bus, timer, ppu, screen);
+
+    DbgWindow dbgWindow(bus);
+    dbgWindow.init(enable_dbg_window);
+
+
+    Emulator emulator(cpu, bus, timer, ppu, screen, dbgWindow);
     
     try {
         emulator.run();

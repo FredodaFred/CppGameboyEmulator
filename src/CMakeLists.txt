@@ -23,6 +23,8 @@ add_library(Core STATIC
     graphics/screen.hpp
     graphics/ppu.cpp
     graphics/ppu.hpp
+        graphics/dbg_window.cpp
+        graphics/dbg_window.hpp
 )
 
 target_include_directories(Core PUBLIC
