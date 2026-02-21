@@ -10,7 +10,7 @@ class Timer {
         //This will request and interrupt
         bool interrupt = false;
     private:
-        uint8_t DIV{0}; // 0xFF04
+        uint8_t DIV{0x18}; // 0xFF04
         uint8_t TIMA{0}; // 0xFF05
         uint8_t TMA{0}; // 0xFF06
         uint8_t TAC{0}; // 0xFF07

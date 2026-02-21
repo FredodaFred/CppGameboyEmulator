@@ -18,7 +18,7 @@ class Bus {
         // Flags 
         // https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable
         uint8_t IE{0};
-        uint8_t IF{0};
+        uint8_t IF{0xE1};
         uint8_t serial_data[2]{0};
 
         //RAM
