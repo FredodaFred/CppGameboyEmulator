@@ -442,12 +442,12 @@ void CPU::ld_a16_sp() {
 void CPU::ldh_a_a8() {
     uint8_t a8 = this->bus.read(this->registers.PC++);
     uint16_t addr = 0xFF00 | a8;
-    this->registers.A = this->bus.read(addr);
+    uint8_t val = this->bus.read(addr);
+    registers.setReg8(Reg8::A, val);
     this->clock_cycles += 3;
 }
 
 void CPU::ld_mc_a() {
-    uint8_t a8 = this->bus.read(this->registers.PC++);
     uint16_t addr = 0xFF00 | this->registers.C;
     this->bus.write(addr, this->registers.A);
     this->clock_cycles += 2;
@@ -595,8 +595,8 @@ void CPU::add_r8_mr(Reg8 r, Reg16 mr) {
 
 void CPU::ld_mr_n8(Reg16 reg16) {
     uint8_t n8 = this->bus.read(this->registers.PC++);
-    this->bus.write(this->registers.getReg16(Reg16::HL), n8);
-   this->clock_cycles += 3;
+    this->bus.write(this->registers.getReg16(reg16), n8);
+    this->clock_cycles += 3;
 }
 
 void CPU::add_r16_r16(Reg16 r1, Reg16 r2) {
@@ -1138,7 +1138,6 @@ void CPU::jp_a16() {
     uint8_t hi = this->bus.read(this->registers.PC++);
     this->registers.PC = static_cast<uint16_t>(hi) << 8 | lo;
     clock_cycles += 4;
-    return;
 }
 
 void CPU::jp_hl() {

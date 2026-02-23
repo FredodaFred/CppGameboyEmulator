@@ -29,7 +29,7 @@ uint8_t Bus::read(uint16_t addr){
     } else if (addr < 0xFE00) {
         // echo ram
     } else if (addr < 0xFEA0) {
-        ppu.read_oam(addr);
+        return ppu.read_oam(addr);
     }  else if (addr < 0xFF00) {
         // unuseable
         return 0x00;
@@ -38,7 +38,7 @@ uint8_t Bus::read(uint16_t addr){
         if (addr == 0xFF0F) {
             return IF;
         }
-       read_io(addr);
+        return read_io(addr);
     } else if (addr < 0xFFFF) {
         return hram_read(addr);
     } else if (addr == 0xFFFF) {
@@ -106,7 +106,7 @@ void Bus::write_io(uint16_t addr, uint8_t data) {
         std::cout << data; //Prints for debugging / BLAARG testts
     } else if (addr == 0xFF02) {
         serial_data[1] = data;
-    } else if (addr >= 0xFF04 && addr < 0xFF08) { //TIMER
+    } else if (addr >= 0xFF04 && addr < 0xFF08) {
         timer.write_timer(addr, data);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         ppu.ppu_io_registers_write(addr, data);
@@ -118,9 +118,9 @@ uint8_t Bus::read_io(uint16_t addr) {
         return serial_data[0];
     } else if (addr == 0xFF02) {
         return serial_data[1];
-    } else if (addr >= 0xFF04 && addr < 0xFF08) { //TIMER
-        return this->timer.read_timer(addr);
+    } else if (addr >= 0xFF04 && addr < 0xFF08) {
+        return timer.read_timer(addr);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
-        return this->ppu.ppu_io_read(addr);
+        return ppu.ppu_io_read(addr);
     }
 }

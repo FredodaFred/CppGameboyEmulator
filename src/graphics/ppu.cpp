@@ -23,6 +23,7 @@ void PPU::tick(int clock_cycles) {
             screen.render(frame_buffer, FRAME_BUFFER_SIZE);
             //ranges::fill(frame_buffer, 0);
             LY = 0;
+            mode = OAM_SCAN;
             vblank_interrupt = false;
         }
 
@@ -57,6 +58,7 @@ void PPU::tick(int clock_cycles) {
     // 456 means the oam_scan, draw, hblank cycle is complete.
     if (dots >= 456) {
         LY++;
+        setSTATBit(2, LY == LYC);
         if (window_enabled()) {
             window_internal_line_counter++;
         }
@@ -93,7 +95,7 @@ void PPU::oam_scan() {
 
 void PPU::draw_scanline() {
     // Note: Scanline (horizontal) is 160 pixels long. So each pixel_pushed increases x_pos by 1
-    while (pixels_pushed - (SCX % 8) < 160) {
+    while (pixels_pushed < 160) {
         bool wx_cond = WX == (pixels_pushed - 7);
         bool window_rendering = window_enabled() && wx_cond && wy_cond;
         uint8_t tile_id = get_tile_map_address(window_rendering);
