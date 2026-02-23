@@ -1090,18 +1090,17 @@ void CPU::cp_a_n8() {
     this->clock_cycles += 2;
 }
 
+// https://gist.github.com/SonoSooS/c0055300670d678b5ae8433e20bea595#nop-and-stop
 void CPU::nop(){ this->clock_cycles++;}
 
 void CPU::stop() {
     this->registers.PC++;
     this->clock_cycles += 2;
-    std::exit(0);
 }
 
 void CPU::halt() {
     this->halted = true;
     this->clock_cycles++;
-    // TODO: when I approach interrupts
 }
 
 // Jumps, returns, etc

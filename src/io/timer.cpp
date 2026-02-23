@@ -14,10 +14,10 @@ void Timer::tick(int clock_cycles) {
 void Timer::tick_tima(int clock_cycles) {
     int divisor = 0;
     switch (TAC & 0x03) {
-        case 0b00: divisor = 1024; break;
-        case 0b01: divisor = 16;   break;
-        case 0b10: divisor = 64;   break;
-        case 0b11: divisor = 256;  break;
+        case 0b00: divisor = 256; break;
+        case 0b01: divisor = 4;   break;
+        case 0b10: divisor = 8;   break;
+        case 0b11: divisor = 64;  break;
     }
 
     int ticks = clock_cycles / divisor;

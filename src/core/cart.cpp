@@ -22,6 +22,7 @@ void Cart::loadFromFile(const string path) {
     file.read(reinterpret_cast<char*>(buffer.data()), size);
 
     parse(buffer);
+    file.close();
 }
 
 uint8_t Cart::read(uint16_t addr) {

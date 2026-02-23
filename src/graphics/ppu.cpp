@@ -6,23 +6,27 @@ PPU::PPU(Screen& screen) : screen(screen) {}
 
 // one frame 70224 dots
 void PPU::tick(int clock_cycles) {
-    dots += clock_cycles * 4;
+    dots += clock_cycles*4;
 
     if (LY >= 144) {
-        mode = VBLANK;
-        setSTATBit(0, true);
-        setSTATBit(1, false);
-        window_internal_line_counter = 0;
+        // Vblank initialization
         if (LY == 144) {
+            mode = VBLANK;
             vblank_interrupt = true;
+            setSTATBit(0, true);
+            setSTATBit(1, false);
+            window_internal_line_counter = 0;
         }
+
         // Final LY value of VBLANK
-        if (LY == 154) {
+        if (LY == 153) {
             screen.render(frame_buffer, FRAME_BUFFER_SIZE);
             //ranges::fill(frame_buffer, 0);
             LY = 0;
             vblank_interrupt = false;
         }
+
+        handle_stat_interrupt();
     } else {
         if (dots < 80) {
             if (!oam_scanned) {
@@ -37,6 +41,7 @@ void PPU::tick(int clock_cycles) {
                 draw_scanline();
                 setSTATBit(0, true);
                 setSTATBit(1, true);
+                handle_stat_interrupt();
             }
         } else {
             if (!hblank_happened) {
@@ -44,6 +49,7 @@ void PPU::tick(int clock_cycles) {
                 setSTATBit(0, false);
                 setSTATBit(1, false);
                 hblank_happened = true;
+                handle_stat_interrupt();
             }
         }
     }
@@ -59,7 +65,6 @@ void PPU::tick(int clock_cycles) {
         scanline_drawn = false;
         hblank_happened = false;
     }
-    handle_stat_interrupt();
 }
 
 void PPU::oam_scan() {

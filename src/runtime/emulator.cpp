@@ -10,7 +10,7 @@ void Emulator::tick() {
     // all other components sync
     ppu.tick(cycles);
     screen.tick();
-    timer.tick(cycles*4);
+    timer.tick(cycles);
 
     //Handle interrupt requests from components
     if (ppu.vblank_interrupt) {

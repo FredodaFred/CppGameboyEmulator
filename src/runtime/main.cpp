@@ -55,6 +55,7 @@ int main(int argc, char* argv[]) {
         emulator.run();
     } catch (const std::runtime_error& e) {
         Logger::close();
+        screen.close();
         std::cout << e.what() << std::endl;
     }
 }
