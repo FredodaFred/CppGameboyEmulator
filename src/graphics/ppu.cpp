@@ -108,7 +108,7 @@ void PPU::draw_scanline() {
     // Note: Scanline (horizontal) is 160 pixels long. So each pixel_pushed increases x_pos by 1
     bool window_possible = window_enabled() && (LY >= WY);
     bool window_triggered_on_line = false;
-    uint8_t window_pixels_pushed = 0;
+    window_pixels_pushed = 0;
 
     while (pixels_pushed < 160) {
         if (window_possible && pixels_pushed >= (WX - 7)) {
@@ -116,10 +116,7 @@ void PPU::draw_scanline() {
         }
         uint8_t tile_id = get_tile_map_address(window_triggered_on_line, window_pixels_pushed);
         uint16_t tile_data = get_tile_data(window_triggered_on_line, tile_id);
-        tile_data_to_pixels(tile_data);
-        if (window_triggered_on_line) {
-            window_pixels_pushed++;
-        }
+        tile_data_to_pixels(window_triggered_on_line, tile_data);
     }
     if (window_triggered_on_line) {
         window_internal_line_counter++;
@@ -180,7 +177,7 @@ uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id) {
  * @param tile_data
  * @return transformed_data
  */
-void PPU::tile_data_to_pixels(uint16_t tile_data) {
+void PPU::tile_data_to_pixels(bool window_rendering, uint16_t tile_data) {
     uint8_t low = static_cast<uint8_t>(tile_data & 0x00FF); // Low is at the bottom
     uint8_t high = static_cast<uint8_t>((tile_data & 0xFF00) >> 8); // High is at the top
     for (int i = 0; i < 8; i++) {
@@ -201,6 +198,9 @@ void PPU::tile_data_to_pixels(uint16_t tile_data) {
 
         }
         pixels_pushed++;
+        if (window_rendering) {
+            window_pixels_pushed++;
+        }
     }
 }
 

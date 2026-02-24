@@ -88,12 +88,13 @@ class PPU {
         /* ------- Pixel FIFO ---- */
         uint8_t frame_buffer[FRAME_BUFFER_SIZE]; // 20 tiles by # of rows
         int pixels_pushed = 0;
+        int window_pixels_pushed{0};
         bool wy_cond{false};
 
         uint8_t get_tile_map_address(bool window_rendering, uint8_t window_pixels_pushed);
         uint16_t get_tile_data(bool window_rendering, uint8_t tile_id);
 
-        void tile_data_to_pixels(uint16_t tile_data);
+        void tile_data_to_pixels(bool window_rendering, uint16_t tile_data);
 
         inline void set_mode(Mode new_mode) {
             mode = new_mode;
