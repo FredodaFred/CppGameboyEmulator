@@ -51,6 +51,8 @@ class PPU {
 
         void draw_scanline();
 
+        bool is_window_tile(uint8_t pixels_pushed) const;
+
         bool oam_scanned{false};
         bool scanline_drawn{false};
         bool hblank_happened{false};
@@ -79,13 +81,16 @@ class PPU {
 
         void setSTATBit(uint8_t bit, bool val);
         inline bool window_enabled() const {return (LCDC & 0x20) != 0;}
+        // LCDC 6
+        inline bool get_window_tile_map() const {return (LCDC & 0x40) != 0;}
+        inline bool get_bg_tile_map() const {return (LCDC & 0x08) != 0;}
 
         /* ------- Pixel FIFO ---- */
         uint8_t frame_buffer[FRAME_BUFFER_SIZE]; // 20 tiles by # of rows
         int pixels_pushed = 0;
         bool wy_cond{false};
 
-        uint8_t get_tile_map_address(bool window_rendering);
+        uint8_t get_tile_map_address(bool window_rendering, uint8_t window_pixels_pushed);
         uint16_t get_tile_data(bool window_rendering, uint8_t tile_id);
 
         void tile_data_to_pixels(uint16_t tile_data);

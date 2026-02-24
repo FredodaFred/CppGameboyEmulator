@@ -106,33 +106,41 @@ void PPU::requestStatInterrupt() {
 
 void PPU::draw_scanline() {
     // Note: Scanline (horizontal) is 160 pixels long. So each pixel_pushed increases x_pos by 1
+    bool window_possible = window_enabled() && (LY >= WY);
+    bool window_triggered_on_line = false;
+    uint8_t window_pixels_pushed = 0;
+
     while (pixels_pushed < 160) {
-        bool wx_cond = WX == (pixels_pushed - 7);
-        bool window_rendering = window_enabled() && wx_cond && wy_cond;
-        uint8_t tile_id = get_tile_map_address(window_rendering);
-        uint16_t tile_data = get_tile_data(window_rendering, tile_id);
+        if (window_possible && pixels_pushed >= (WX - 7)) {
+            window_triggered_on_line = true;
+        }
+        uint8_t tile_id = get_tile_map_address(window_triggered_on_line, window_pixels_pushed);
+        uint16_t tile_data = get_tile_data(window_triggered_on_line, tile_id);
         tile_data_to_pixels(tile_data);
+        if (window_triggered_on_line) {
+            window_pixels_pushed++;
+        }
+    }
+    if (window_triggered_on_line) {
+        window_internal_line_counter++;
     }
     scanline_drawn = true;
 }
 
 /**
- * This returns tileId. By finding the correct tileID, we can use this id to get to the correct tile data/
+ * This returns tileId. By finding the correct tileID, we can use this id to get to the correct tile data
  */
-uint8_t PPU::get_tile_map_address(bool window_rendering) {
-    bool window_tile_map = (LCDC & 0x40) != 0; // LCDC 6
-    bool bg_tile_map = ((LCDC & 0x08) != 0) ; // LCDC 3
+uint8_t PPU::get_tile_map_address(bool window_rendering, uint8_t window_pixels_pushed) {
     uint8_t x_pos;
     uint8_t y_pos;
     uint16_t tile_map_addr;
 
     if (window_rendering) {
-        int window_x = pixels_pushed - (WX - 7);
-        if (window_x < 0) x_pos = 0; else x_pos = pixels_pushed - (WX - 7);
+        tile_map_addr = get_window_tile_map() ? 0x9C00 : 0x9800;
+        x_pos = window_pixels_pushed / 8;
         y_pos = window_internal_line_counter;
-        tile_map_addr = window_tile_map ? 0x9C00 : 0x9800;
     } else {
-        tile_map_addr = bg_tile_map ? 0x9C00 : 0x9800;
+        tile_map_addr = get_bg_tile_map() ? 0x9C00 : 0x9800;
         x_pos = ((SCX + pixels_pushed) / 8) & 0x1F;
         y_pos = (LY + SCY) & 255;
     }
@@ -143,12 +151,11 @@ uint8_t PPU::get_tile_map_address(bool window_rendering) {
 
 //https://gbdev.io/pandocs/Tile_Data.html#vram-tile-data
 uint16_t PPU::get_tile_data(bool window_rendering, uint8_t tile_id) {
-    /* 0 = 8800–97FF; 1 = 8000–8FFF
-     * We are drawing at a y_pos, so we only need one row (2 bytes) from the entire tile.
-     * Therefore, we will grab the correct "index" for the row in the tile data ( think row 1 2bytes | row 2 2 byes) / sequential memory */
-
-    uint8_t row = window_rendering ? window_internal_line_counter % 8 : (LY + SCY) % 8;
     uint16_t base;
+    uint8_t row = window_rendering ?
+            (window_internal_line_counter % 8) :
+            ((LY + SCY) % 8);
+
     if (LCDC & 0x10) {
         base = 0x8000 + (tile_id * 16);
     } else {
@@ -203,25 +210,6 @@ void PPU::setSTATBit(uint8_t bit, bool val) {
     else     STAT &= ~(1 << bit);
 }
 
-// https://nnarain.github.io/2016/09/09/Gameboy-LCD-Controller.html
-// Remember, only the CPU changes bits 3,4,5,6 of STAT. Same idea as the IF register.
-// void PPU::handle_stat_interrupt() {
-//     // 2 flag must mirror LY == LYC, this is constantly being checked (according to pan docs)
-//     setSTATBit(2, LY == LYC);
-//     // Collects any valid stat interrupts
-//     bool current_stat_line = ((LY == LYC) && (STAT & 0x40)) ||         // LYC == LY interrupt
-//                              ((mode == OAM_SCAN) && (STAT & 0x20)) ||  // OAM Interrupt
-//                              ((mode == VBLANK) && (STAT & 0x10)) ||   // VBLANK interrupt
-//                              ((mode == HBLANK) && (STAT & 0x08));    // HBLANK interrupt
-//
-//     if (current_stat_line && !prev_lcd_stat_interrupt) {
-//         lcd_stat_interrupt = true;
-//     } else if (!current_stat_line && prev_lcd_stat_interrupt) {
-//         lcd_stat_interrupt = false;
-//     }
-//
-//     prev_lcd_stat_interrupt = current_stat_line;
-// }
 
 void PPU::ppu_io_registers_write(uint16_t addr, uint8_t data) {
     switch (addr) {
