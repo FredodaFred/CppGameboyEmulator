@@ -6,13 +6,19 @@
 
 //https://gbdev.io/pandocs/Rendering.html#rendering-overview
 enum Mode {
-    VBLANK, HBLANK, DRAW, OAM_SCAN
+    HBLANK   = 0,
+    VBLANK   = 1,
+    OAM_SCAN = 2,
+    DRAW     = 3
 };
 
 class PPU {
     public:
         PPU(Screen& screen);
         void tick(int clock_cycles);
+
+        void tick_dot();
+
         void write_vram(uint16_t addr, uint8_t data);
         uint8_t read_vram(uint16_t addr);
 
@@ -79,4 +85,11 @@ class PPU {
         uint16_t get_tile_data(bool window_rendering, uint8_t tile_id);
 
         void tile_data_to_pixels(uint16_t tile_data);
+
+        inline void set_mode(Mode new_mode) {
+            mode = new_mode;
+
+            // STAT bits 0–1 store current PPU mode
+            STAT = (STAT & 0xFC) | static_cast<uint8_t>(new_mode);
+        }
 };

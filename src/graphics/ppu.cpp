@@ -5,63 +5,49 @@ using namespace std;
 PPU::PPU(Screen& screen) : screen(screen) {}
 
 // one frame 70224 dots
-void PPU::tick(int clock_cycles) {
-    dots += clock_cycles*4;
+void PPU::tick(int cycles) {
+    for (int i = 0; i < cycles * 4; i++) {
+        tick_dot();
+    }
+}
+
+void PPU::tick_dot() {
+    dots++;
 
     if (LY >= 144) {
-        // Vblank initialization
-        if (LY == 144) {
-            mode = VBLANK;
+        if (dots == 1 && LY == 144) {
+            set_mode(VBLANK);
             vblank_interrupt = true;
-            setSTATBit(0, true);
-            setSTATBit(1, false);
             window_internal_line_counter = 0;
         }
 
-        // Final LY value of VBLANK
-        if (LY == 153) {
-            screen.render(frame_buffer, FRAME_BUFFER_SIZE);
-            LY = 0;
-            mode = OAM_SCAN;
-            vblank_interrupt = false;
-        }
+        if (dots >= 456) {
+            dots = 0;
+            LY++;
 
-        handle_stat_interrupt();
-    } else {
-        if (dots < 80) {
-            if (!oam_scanned) {
-                mode = OAM_SCAN;
-                setSTATBit(0, false);
-                setSTATBit(1, true);
-                oam_scan();
-            }
-        } else if (dots < 252) {
-            if (!scanline_drawn) {
-                mode = DRAW;
-                draw_scanline();
-                setSTATBit(0, true);
-                setSTATBit(1, true);
-                handle_stat_interrupt();
-            }
-        } else {
-            if (!hblank_happened) {
-                mode = HBLANK;
-                setSTATBit(0, false);
-                setSTATBit(1, false);
-                hblank_happened = true;
-                handle_stat_interrupt();
+            if (LY > 153) {
+                LY = 0;
+                set_mode(OAM_SCAN);
+                vblank_interrupt = false;
+                screen.render(frame_buffer, FRAME_BUFFER_SIZE);
             }
         }
+        return;
     }
 
-    // 456 means the oam_scan, draw, hblank cycle is complete.
+    if (dots == 1) {
+        set_mode(OAM_SCAN);
+    } else if (dots == 81) {
+        set_mode(DRAW);
+        pixels_pushed = 0;
+        draw_scanline();
+    } else if (dots == 253) {
+        set_mode(HBLANK);
+    }
+
     if (dots >= 456) {
+        dots = 0;
         LY++;
-        setSTATBit(2, LY == LYC);
-        if (window_enabled()) {
-            window_internal_line_counter++;
-        }
-        dots -= 456;
         oam_scanned = false;
         scanline_drawn = false;
         hblank_happened = false;
@@ -92,6 +78,8 @@ void PPU::oam_scan() {
     oam_scanned = true;
 }
 
+
+
 void PPU::draw_scanline() {
     // Note: Scanline (horizontal) is 160 pixels long. So each pixel_pushed increases x_pos by 1
     while (pixels_pushed < 160) {
@@ -102,7 +90,6 @@ void PPU::draw_scanline() {
         tile_data_to_pixels(tile_data);
     }
     scanline_drawn = true;
-    pixels_pushed = 0;
 }
 
 /**
@@ -193,9 +180,9 @@ void PPU::handle_stat_interrupt() {
     // 2 flag must mirror LY == LYC, this is constantly being checked (according to pan docs)
     setSTATBit(2, LY == LYC);
     // Collects any valid stat interrupts
-    bool current_stat_line = ((LY == LYC) && (STAT & 0x40)) |         // LYC == LY interrupt
-                             ((mode == OAM_SCAN) && (STAT & 0x20)) |  // OAM Interrupt
-                             ((mode == VBLANK) && (STAT & 0x10)) |   // VBLANK interrupt
+    bool current_stat_line = ((LY == LYC) && (STAT & 0x40)) ||         // LYC == LY interrupt
+                             ((mode == OAM_SCAN) && (STAT & 0x20)) ||  // OAM Interrupt
+                             ((mode == VBLANK) && (STAT & 0x10)) ||   // VBLANK interrupt
                              ((mode == HBLANK) && (STAT & 0x08));    // HBLANK interrupt
 
     if (current_stat_line && !prev_lcd_stat_interrupt) {
@@ -255,10 +242,6 @@ uint8_t PPU::ppu_io_read(uint16_t addr) {
 
 /*-------- RAM -------- */
 void PPU::write_vram(uint16_t addr, uint8_t data) {
-    // if (mode == DRAW) {
-    //     // ignore writes while drawing to LCD screen
-    //     return;
-    // }
     VRAM[addr - 0x8000] = data;
 }
 
