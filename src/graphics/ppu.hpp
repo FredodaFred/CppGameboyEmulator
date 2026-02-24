@@ -45,6 +45,10 @@ class PPU {
         uint16_t draw_buffer();
         uint8_t read_vram_internal(uint16_t addr);
 
+        void increment_LY();
+
+        void requestStatInterrupt();
+
         void draw_scanline();
 
         bool oam_scanned{false};

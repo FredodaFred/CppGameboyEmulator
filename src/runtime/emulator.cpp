@@ -16,14 +16,17 @@ void Emulator::tick() {
     if (ppu.vblank_interrupt) {
         uint8_t if_val = bus.read(0xFF0F);
         bus.write(0xFF0F, if_val | Interrupt::VBLANK);
+        ppu.vblank_interrupt = false;
     }
-    if (ppu.lcd_stat_interrupt != ppu.prev_lcd_stat_interrupt && ppu.lcd_stat_interrupt) {
+    if (ppu.lcd_stat_interrupt) {
         uint8_t if_val = bus.read(0xFF0F);
         bus.write(0xFF0F, if_val | Interrupt::LCD_STAT);
+        ppu.lcd_stat_interrupt = false;
     }
     if (timer.interrupt) {
         uint8_t if_val = bus.read(0xFF0F);
         bus.write(0xFF0F, if_val | Interrupt::TIMER);
+        timer.interrupt = false;
     }
 }
 

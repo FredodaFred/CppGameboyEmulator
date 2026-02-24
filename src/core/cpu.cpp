@@ -15,8 +15,7 @@ int CPU::step() {
             this->halted = false;
         }
 
-        clock_cycles++;
-        return clock_cycles;
+        return 1;
     }
 
     if (IME_delay == 2) { IME_delay--;}
@@ -1100,7 +1099,6 @@ void CPU::stop() {
 
 void CPU::halt() {
     this->halted = true;
-    this->clock_cycles++;
 }
 
 // Jumps, returns, etc

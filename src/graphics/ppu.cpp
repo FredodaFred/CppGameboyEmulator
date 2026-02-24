@@ -23,9 +23,9 @@ void PPU::tick_dot() {
 
         if (dots >= 456) {
             dots = 0;
-            LY++;
+            increment_LY();
 
-            if (LY > 153) {
+            if (LY == 153) {
                 LY = 0;
                 set_mode(OAM_SCAN);
                 vblank_interrupt = false;
@@ -47,7 +47,7 @@ void PPU::tick_dot() {
 
     if (dots >= 456) {
         dots = 0;
-        LY++;
+        increment_LY();
         oam_scanned = false;
         scanline_drawn = false;
         hblank_happened = false;
@@ -79,6 +79,24 @@ void PPU::oam_scan() {
 }
 
 
+// #define LCDS_LYC (BIT(lcd_get_context()->lcds, 2))
+// #define LCDS_LYC_SET(b) (BIT_SET(lcd_get_context()->lcds, 2, b))
+void PPU::increment_LY() {
+    LY++;
+    if (LY == LYC) {
+        setSTATBit(2, true);
+        uint8_t SS_LYC = (1 << 6);
+        if (STAT & SS_LYC) {
+            requestStatInterrupt();
+        }
+    } else {
+        setSTATBit(2, false);
+    }
+}
+
+void PPU::requestStatInterrupt() {
+    lcd_stat_interrupt = true;
+}
 
 void PPU::draw_scanline() {
     // Note: Scanline (horizontal) is 160 pixels long. So each pixel_pushed increases x_pos by 1
@@ -187,6 +205,8 @@ void PPU::handle_stat_interrupt() {
 
     if (current_stat_line && !prev_lcd_stat_interrupt) {
         lcd_stat_interrupt = true;
+    } else if (!current_stat_line && prev_lcd_stat_interrupt) {
+        lcd_stat_interrupt = false;
     }
 
     prev_lcd_stat_interrupt = current_stat_line;
