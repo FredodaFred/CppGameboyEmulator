@@ -24,7 +24,9 @@ void PPU::tick_dot() {
         if (dots >= 456) {
             dots = 0;
             increment_LY();
-
+            if ((STAT & 0x10)) {
+                requestStatInterrupt();
+            }
             if (LY == 153) {
                 LY = 0;
                 set_mode(OAM_SCAN);
@@ -37,12 +39,18 @@ void PPU::tick_dot() {
 
     if (dots == 1) {
         set_mode(OAM_SCAN);
+        if(STAT & 0x20) {
+            requestStatInterrupt();
+        }
     } else if (dots == 81) {
         set_mode(DRAW);
         pixels_pushed = 0;
         draw_scanline();
     } else if (dots == 253) {
         set_mode(HBLANK);
+        if(STAT & 0x08) {
+            requestStatInterrupt();
+        }
     }
 
     if (dots >= 456) {
@@ -79,8 +87,6 @@ void PPU::oam_scan() {
 }
 
 
-// #define LCDS_LYC (BIT(lcd_get_context()->lcds, 2))
-// #define LCDS_LYC_SET(b) (BIT_SET(lcd_get_context()->lcds, 2, b))
 void PPU::increment_LY() {
     LY++;
     if (LY == LYC) {
@@ -180,7 +186,12 @@ void PPU::tile_data_to_pixels(uint16_t tile_data) {
         // Only write to the buffer if the pixel is actually visible on screen
         if (screen_x >= 0 && screen_x < 160) {
             int buffer_index = (LY * 160) + screen_x;
-            frame_buffer[buffer_index] = pixel;
+            if ((LCDC & 0x01) != 1) {
+                frame_buffer[buffer_index] = 0x00;
+            } else {
+                frame_buffer[buffer_index] = pixel;
+            }
+
         }
         pixels_pushed++;
     }
@@ -194,23 +205,23 @@ void PPU::setSTATBit(uint8_t bit, bool val) {
 
 // https://nnarain.github.io/2016/09/09/Gameboy-LCD-Controller.html
 // Remember, only the CPU changes bits 3,4,5,6 of STAT. Same idea as the IF register.
-void PPU::handle_stat_interrupt() {
-    // 2 flag must mirror LY == LYC, this is constantly being checked (according to pan docs)
-    setSTATBit(2, LY == LYC);
-    // Collects any valid stat interrupts
-    bool current_stat_line = ((LY == LYC) && (STAT & 0x40)) ||         // LYC == LY interrupt
-                             ((mode == OAM_SCAN) && (STAT & 0x20)) ||  // OAM Interrupt
-                             ((mode == VBLANK) && (STAT & 0x10)) ||   // VBLANK interrupt
-                             ((mode == HBLANK) && (STAT & 0x08));    // HBLANK interrupt
-
-    if (current_stat_line && !prev_lcd_stat_interrupt) {
-        lcd_stat_interrupt = true;
-    } else if (!current_stat_line && prev_lcd_stat_interrupt) {
-        lcd_stat_interrupt = false;
-    }
-
-    prev_lcd_stat_interrupt = current_stat_line;
-}
+// void PPU::handle_stat_interrupt() {
+//     // 2 flag must mirror LY == LYC, this is constantly being checked (according to pan docs)
+//     setSTATBit(2, LY == LYC);
+//     // Collects any valid stat interrupts
+//     bool current_stat_line = ((LY == LYC) && (STAT & 0x40)) ||         // LYC == LY interrupt
+//                              ((mode == OAM_SCAN) && (STAT & 0x20)) ||  // OAM Interrupt
+//                              ((mode == VBLANK) && (STAT & 0x10)) ||   // VBLANK interrupt
+//                              ((mode == HBLANK) && (STAT & 0x08));    // HBLANK interrupt
+//
+//     if (current_stat_line && !prev_lcd_stat_interrupt) {
+//         lcd_stat_interrupt = true;
+//     } else if (!current_stat_line && prev_lcd_stat_interrupt) {
+//         lcd_stat_interrupt = false;
+//     }
+//
+//     prev_lcd_stat_interrupt = current_stat_line;
+// }
 
 void PPU::ppu_io_registers_write(uint16_t addr, uint8_t data) {
     switch (addr) {
