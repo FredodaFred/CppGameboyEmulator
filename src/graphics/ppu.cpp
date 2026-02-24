@@ -21,7 +21,6 @@ void PPU::tick(int clock_cycles) {
         // Final LY value of VBLANK
         if (LY == 153) {
             screen.render(frame_buffer, FRAME_BUFFER_SIZE);
-            //ranges::fill(frame_buffer, 0);
             LY = 0;
             mode = OAM_SCAN;
             vblank_interrupt = false;
@@ -124,7 +123,6 @@ uint8_t PPU::get_tile_map_address(bool window_rendering) {
     } else {
         tile_map_addr = bg_tile_map ? 0x9C00 : 0x9800;
         x_pos = ((SCX + pixels_pushed) / 8) & 0x1F;
-        //std::cout << format("X Pos: {:02X}", x_pos) << std::endl;
         y_pos = (LY + SCY) & 255;
     }
     uint16_t offset = ((y_pos / 8) * 32 ) + x_pos;
@@ -265,10 +263,10 @@ void PPU::write_vram(uint16_t addr, uint8_t data) {
 }
 
 uint8_t PPU::read_vram(uint16_t addr) {
-    //     if (mode == DRAW) {
-    //     // return garbage data if drawing to ignore
-    //     return 0xFF;
-    // }
+        if (mode == DRAW) {
+        // return garbage data if drawing to ignore
+        return 0xFF;
+    }
     return VRAM[addr - 0x8000];
 }
 
