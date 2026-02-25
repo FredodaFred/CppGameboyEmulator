@@ -35,6 +35,7 @@ class CPU {
          */
         bool IME{false};
         bool halted{false};
+        bool halt_bug{false};
         // Assists with one instruction delay for EI and DI
         uint8_t IME_delay{0};
 

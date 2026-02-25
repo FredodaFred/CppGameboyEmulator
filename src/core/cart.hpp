@@ -25,6 +25,7 @@ class Cart {
 
     private:
         std::vector<uint8_t> rom;
+        uint8_t rom_bank{1};
         void parse(const std::vector<uint8_t>& data);
         void parse_header(const std::vector<uint8_t>& data);
 };

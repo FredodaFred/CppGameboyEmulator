@@ -17,6 +17,7 @@ class Timer {
 
         int tima_remainder{0};
         int div_remainder{0};
+        int tima_overflow_pending = 0;
         void tick_tima(int clock_cycles);
         void tick_div(int clock_cycles);
 };

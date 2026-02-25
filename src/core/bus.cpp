@@ -27,7 +27,7 @@ uint8_t Bus::read(uint16_t addr){
     }  else if (addr < 0xE000) {
         return wram_read(addr);
     } else if (addr < 0xFE00) {
-        // echo ram
+        return wram_read(addr - 0x2000);
     } else if (addr < 0xFEA0) {
         return ppu.read_oam(addr);
     }  else if (addr < 0xFF00) {
@@ -123,4 +123,7 @@ uint8_t Bus::read_io(uint16_t addr) {
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         return ppu.ppu_io_read(addr);
     }
+
+    printf("WARNING: unhandled IO read at 0x%04X\n", addr);
+    return 0xFF;
 }

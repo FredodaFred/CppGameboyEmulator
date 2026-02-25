@@ -25,14 +25,29 @@ void Cart::loadFromFile(const string path) {
     file.close();
 }
 
+
+
 uint8_t Cart::read(uint16_t addr) {
-    return this->rom.at(addr);
+    if (addr < 0x4000) {
+        return rom[addr]; // bank 0, always fixed
+    } else if (addr < 0x8000) {
+        // banked region
+        uint32_t banked_addr = (rom_bank * 0x4000) + (addr - 0x4000);
+        return rom.at(banked_addr);
+    } else if (addr >= 0xA000 && addr < 0xC000) {
+        return 0xFF; // no cart RAM for this ROM
+    }
+    return 0xFF;
 }
 
 void Cart::write(uint16_t addr, uint8_t data) {
-    this->rom[addr] = data;
+    if (addr >= 0x2000 && addr < 0x4000) {
+        // MBC1 ROM bank number register
+        rom_bank = data & 0x1F;
+        if (rom_bank == 0) rom_bank = 1; // bank 0 not selectable, maps to 1
+    }
+    // ignore other writes to ROM space
 }
-
 
 void Cart::parse(const vector<uint8_t>& data) {
     parse_header(data);

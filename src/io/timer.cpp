@@ -12,11 +12,21 @@ void Timer::tick(int clock_cycles) {
 }
 
 void Timer::tick_tima(int clock_cycles) {
+
+    if (tima_overflow_pending > 0) {
+        tima_overflow_pending -= clock_cycles;
+        if (tima_overflow_pending <= 0) {
+            TIMA = TMA;
+            interrupt = true;
+            tima_overflow_pending = 0;
+        }
+    }
+
     int divisor = 0;
     switch (TAC & 0x03) {
         case 0b00: divisor = 256; break;
         case 0b01: divisor = 4;   break;
-        case 0b10: divisor = 8;   break;
+        case 0b10: divisor = 16;   break;
         case 0b11: divisor = 64;  break;
     }
 
@@ -26,7 +36,7 @@ void Timer::tick_tima(int clock_cycles) {
     for (int i = 0; i < ticks; i++) {
         if (TIMA == 0xFF) {
             TIMA = TMA;
-            interrupt = true; // Stay true until Emulator.tick handles it
+            tima_overflow_pending = 4;
         } else {
             TIMA++;
         }
@@ -35,7 +45,7 @@ void Timer::tick_tima(int clock_cycles) {
 
 void Timer::tick_div(int clock_cycles) {
     DIV += clock_cycles / 64;
-    div_remainder += clock_cycles % 64;
+    div_remainder = clock_cycles % 64;
 }
 
 void Timer::write_timer(uint16_t addr, uint8_t data) {

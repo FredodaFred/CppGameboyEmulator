@@ -29,7 +29,13 @@ int CPU::step() {
     if (!interrupt_handled) {
         uint8_t opcode = this->fetch();
         if (Logger::is_enabled()) Logger::log_cpu_state(this->registers, opcode);
-        this->registers.PC++;
+        if (halt_bug) {
+            halt_bug = false;
+            // Don't increment PC — execute the byte at current PC again next time
+            // by skipping the PC++ this instruction only
+        } else {
+            this->registers.PC++;
+        }
         this->execute(opcode);
     }
 
@@ -1098,7 +1104,17 @@ void CPU::stop() {
 }
 
 void CPU::halt() {
-    this->halted = true;
+    uint8_t IE = bus.read(0xFFFF);
+    uint8_t IF = bus.read(0xFF0F);
+
+    if (!IME && (IE & IF & 0x1F) != 0) {
+        // HALT bug: don't halt, but next instruction's PC won't increment
+        this->halt_bug = true;
+    } else {
+        this->halted = true;
+    }
+    // halt itself takes 1 M-cycle
+    this->clock_cycles += 1;
 }
 
 // Jumps, returns, etc
