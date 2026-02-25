@@ -56,7 +56,7 @@ class PPU {
         bool oam_scanned{false};
         bool scanline_drawn{false};
         bool hblank_happened{false};
-        uint8_t sprite_buffer[40]{};
+        std::vector<uint32_t> sprite_buffer;
 
         void handle_stat_interrupt();
 
@@ -98,6 +98,9 @@ class PPU {
 
         inline void set_mode(Mode new_mode) {
             mode = new_mode;
+            if (new_mode == 0 && (STAT & 0x08)) lcd_stat_interrupt = true; // HBlank
+            if (new_mode == 1 && (STAT & 0x10)) lcd_stat_interrupt = true; // VBlank
+            if (new_mode == 2 && (STAT & 0x20)) lcd_stat_interrupt = true; // OAM
 
             // STAT bits 0–1 store current PPU mode
             STAT = (STAT & 0xFC) | static_cast<uint8_t>(new_mode);

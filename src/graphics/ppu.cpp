@@ -62,48 +62,6 @@ void PPU::tick_dot() {
     }
 }
 
-void PPU::oam_scan() {
-    wy_cond = (WY == LY) && window_enabled();
-    ranges::fill(sprite_buffer, 0);
-    int obj_idx = 0;
-    for (int byte = 0; byte < 160; byte += 4) {
-        uint8_t y_pos = OAM[byte];
-        uint8_t x_pos = OAM[byte+1];
-        uint8_t tile_idx = OAM[byte+2];
-        uint8_t attr_flags = OAM[byte+3];
-        int size = (LCDC & 0x04) ? 2 : 1; // 0 = 8x8, 1= 8x16
-        bool in_range = LY + 16 >= y_pos && LY + 16 < y_pos  + 8 * size;
-        if (in_range && obj_idx != 10) {
-
-            int offset = obj_idx * 4;
-            sprite_buffer[offset] = y_pos;
-            sprite_buffer[offset+1] = x_pos;
-            sprite_buffer[offset+2] = tile_idx;
-            sprite_buffer[offset+3] = attr_flags;
-            obj_idx++;
-        }
-    }
-    oam_scanned = true;
-}
-
-
-void PPU::increment_LY() {
-    LY++;
-    if (LY == LYC) {
-        setSTATBit(2, true);
-        uint8_t SS_LYC = (1 << 6);
-        if (STAT & SS_LYC) {
-            requestStatInterrupt();
-        }
-    } else {
-        setSTATBit(2, false);
-    }
-}
-
-void PPU::requestStatInterrupt() {
-    lcd_stat_interrupt = true;
-}
-
 void PPU::draw_scanline() {
     // Note: Scanline (horizontal) is 160 pixels long. So each pixel_pushed increases x_pos by 1
     bool window_possible = window_enabled() && (LY >= WY);
@@ -193,7 +151,7 @@ void PPU::tile_data_to_pixels(bool window_rendering, uint16_t tile_data) {
             if ((LCDC & 0x01) != 1) {
                 frame_buffer[buffer_index] = 0x00;
             } else {
-                frame_buffer[buffer_index] = pixel;
+                    frame_buffer[buffer_index] = pixel;
             }
 
         }
@@ -202,6 +160,54 @@ void PPU::tile_data_to_pixels(bool window_rendering, uint16_t tile_data) {
             window_pixels_pushed++;
         }
     }
+}
+
+void PPU::oam_scan() {
+    wy_cond = (WY == LY) && window_enabled();
+    ranges::fill(sprite_buffer, 0);
+    int obj_idx = 0;
+    for (int byte = 0; byte < 160; byte += 4) {
+        uint8_t y_pos = OAM[byte];
+        uint8_t x_pos = OAM[byte+1];
+        uint8_t tile_idx = OAM[byte+2];
+        uint8_t attr_flags = OAM[byte+3];
+        int size = (LCDC & 0x04) ? 2 : 1; // 0 = 8x8, 1= 8x16
+        bool in_range = LY + 16 >= y_pos && LY + 16 < y_pos  + 8 * size;
+        if (in_range && obj_idx != 10) {
+
+            int offset = obj_idx * 4;
+            // sprite_buffer[offset] = y_pos;
+            // sprite_buffer[offset+1] = x_pos;
+            // sprite_buffer[offset+2] = tile_idx;
+            // sprite_buffer[offset+3] = attr_flags;
+
+            uint32_t sprite = static_cast<uint32_t>(tile_idx) << 24 |
+                             static_cast<uint32_t>(attr_flags)  << 16 |
+                             static_cast<uint32_t>(x_pos) << 8 |
+                             static_cast<uint32_t>(y_pos);
+            sprite_buffer.push_back(sprite);
+            obj_idx++;
+        }
+    }
+    oam_scanned = true;
+}
+
+
+void PPU::increment_LY() {
+    LY++;
+    if (LY == LYC) {
+        setSTATBit(2, true);
+        uint8_t SS_LYC = (1 << 6);
+        if (STAT & SS_LYC) {
+            requestStatInterrupt();
+        }
+    } else {
+        setSTATBit(2, false);
+    }
+}
+
+void PPU::requestStatInterrupt() {
+    lcd_stat_interrupt = true;
 }
 
 
