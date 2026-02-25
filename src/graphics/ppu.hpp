@@ -51,6 +51,8 @@ class PPU {
 
         void draw_scanline();
 
+        void draw_sprites_onto_scanline();
+
         bool is_window_tile(uint8_t pixels_pushed) const;
 
         bool oam_scanned{false};
@@ -95,6 +97,8 @@ class PPU {
         uint16_t get_tile_data(bool window_rendering, uint8_t tile_id);
 
         void tile_data_to_pixels(bool window_rendering, uint16_t tile_data);
+
+        uint8_t map_color_id_to_color_palette(uint8_t color_id, uint8_t palette);
 
         inline void set_mode(Mode new_mode) {
             mode = new_mode;

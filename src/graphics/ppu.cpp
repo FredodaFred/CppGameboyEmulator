@@ -30,10 +30,10 @@ void PPU::tick_dot() {
             if (LY == 153) {
                 LY = 0;
                 set_mode(OAM_SCAN);
-                vblank_interrupt = false;
                 screen.render(frame_buffer, FRAME_BUFFER_SIZE);
             }
         }
+
         return;
     }
 
@@ -42,6 +42,7 @@ void PPU::tick_dot() {
         if(STAT & 0x20) {
             requestStatInterrupt();
         }
+        oam_scan();
     } else if (dots == 81) {
         set_mode(DRAW);
         pixels_pushed = 0;
@@ -79,7 +80,55 @@ void PPU::draw_scanline() {
     if (window_triggered_on_line) {
         window_internal_line_counter++;
     }
+
+    draw_sprites_onto_scanline();
     scanline_drawn = true;
+}
+
+void PPU::draw_sprites_onto_scanline() {
+    if (!(LCDC & 0x02)) return; // OBJ disabled
+    for (const uint32_t& sprite : sprite_buffer) {
+        uint8_t y_pos      = sprite & 0xFF;
+        uint8_t x_pos      = (sprite >> 8) & 0xFF;
+        uint8_t tile_id   = (sprite >> 16) & 0xFF;
+        uint8_t attr_flags = (sprite >> 24) & 0xFF;
+
+        // Y = Object’s vertical position on the screen + 16. So for exampl
+        bool y_flip = (attr_flags & 0x40) != 0;
+        uint8_t sprite_row = LY - (y_pos - 16);
+        uint8_t sprite_height = (LCDC & 0x04) ? 16 : 8;
+        if (y_flip) sprite_row = (sprite_height - 1) - sprite_row;
+
+        // Get tile to edit
+        uint16_t tile_addr = 0x8000 + (tile_id * 16) + (sprite_row * 2);
+        uint8_t low  = read_vram_internal(tile_addr);
+        uint8_t high = read_vram_internal(tile_addr + 1);
+
+        // iterate through tile's pixels
+        for (int i = 0; i < 8; i++) {
+            uint8_t bit_idx = 7 - i;
+            uint8_t b0 = (low >> bit_idx) & 1;
+            uint8_t b1 = (high >> bit_idx) & 1;
+            uint8_t pixel = (b1 << 1) | b0;
+
+            // Do not render transparent pixels
+            bool dmg_palette = (attr_flags & 0x10) != 0;
+            if (pixel == 0) continue;
+
+            bool x_flip = (attr_flags & 0x20) != 0;
+            int screen_x = x_flip ? x_pos - 8 + (7-i) : x_pos - 8 + i;
+
+            // Verify sprite is not hidden
+            if (screen_x < 0 || screen_x >= 160) continue;
+
+            // Priority: 0 = No, 1 = BG and Window color indices 1–3 are drawn over this OBJ
+            bool bg_priority = attr_flags & 0x80;
+            if (bg_priority && frame_buffer[(LY * 160) + screen_x] != 0) continue;
+
+            uint8_t color_value = dmg_palette ? map_color_id_to_color_palette(pixel, OBP1) : map_color_id_to_color_palette(pixel, OBP0);
+            frame_buffer[(LY * 160) + screen_x] = color_value;
+        }
+    }
 }
 
 /**
@@ -151,7 +200,7 @@ void PPU::tile_data_to_pixels(bool window_rendering, uint16_t tile_data) {
             if ((LCDC & 0x01) != 1) {
                 frame_buffer[buffer_index] = 0x00;
             } else {
-                    frame_buffer[buffer_index] = pixel;
+               frame_buffer[buffer_index] = map_color_id_to_color_palette(pixel, BGP);
             }
 
         }
@@ -161,32 +210,32 @@ void PPU::tile_data_to_pixels(bool window_rendering, uint16_t tile_data) {
         }
     }
 }
+uint8_t PPU::map_color_id_to_color_palette(uint8_t color_id, uint8_t palette) {
+    switch(color_id) {
+        case(0x00): return (palette & 0x03);
+        case(0x01): return ((palette >> 2) & 0x03);
+        case(0x02): return ((palette >> 4) & 0x03);
+        case(0x03): return ((palette >> 6) & 0x03);
+        default: throw std::runtime_error("unknown color palette");
+    }
+}
 
 void PPU::oam_scan() {
+    sprite_buffer.clear();
     wy_cond = (WY == LY) && window_enabled();
-    ranges::fill(sprite_buffer, 0);
-    int obj_idx = 0;
     for (int byte = 0; byte < 160; byte += 4) {
-        uint8_t y_pos = OAM[byte];
-        uint8_t x_pos = OAM[byte+1];
-        uint8_t tile_idx = OAM[byte+2];
+        uint8_t y_pos      = OAM[byte];
+        uint8_t x_pos      = OAM[byte+1];
+        uint8_t tile_idx   = OAM[byte+2];
         uint8_t attr_flags = OAM[byte+3];
-        int size = (LCDC & 0x04) ? 2 : 1; // 0 = 8x8, 1= 8x16
-        bool in_range = LY + 16 >= y_pos && LY + 16 < y_pos  + 8 * size;
-        if (in_range && obj_idx != 10) {
-
-            int offset = obj_idx * 4;
-            // sprite_buffer[offset] = y_pos;
-            // sprite_buffer[offset+1] = x_pos;
-            // sprite_buffer[offset+2] = tile_idx;
-            // sprite_buffer[offset+3] = attr_flags;
-
+        int size = (LCDC & 0x04) ? 2 : 1;
+        bool in_range = LY + 16 >= y_pos && LY + 16 < y_pos + 8 * size;
+        if (in_range && sprite_buffer.size() < 10) {
             uint32_t sprite = static_cast<uint32_t>(tile_idx) << 24 |
-                             static_cast<uint32_t>(attr_flags)  << 16 |
-                             static_cast<uint32_t>(x_pos) << 8 |
-                             static_cast<uint32_t>(y_pos);
+                              static_cast<uint32_t>(attr_flags) << 16 |
+                              static_cast<uint32_t>(x_pos) << 8 |
+                              static_cast<uint32_t>(y_pos);
             sprite_buffer.push_back(sprite);
-            obj_idx++;
         }
     }
     oam_scanned = true;
