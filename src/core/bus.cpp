@@ -68,8 +68,11 @@ void Bus::write(uint16_t addr, uint8_t data){
     } else if (addr < 0xFF80) {
         if (addr == 0xFF0F) {
             IF = data;
+        } else if (addr == 0xFF46) {
+            dma_transfer(data);
+        } else {
+            write_io(addr, data);
         }
-        write_io(addr, data);
     } else if (addr < 0xFFFF) {
         hram_write(addr, data);
     } else if (addr == 0xFFFF) {
@@ -78,6 +81,13 @@ void Bus::write(uint16_t addr, uint8_t data){
         throw std::runtime_error("Invalid Memory Address");
     }
 
+}
+
+void Bus::dma_transfer(uint8_t data) {
+    uint16_t src =  data << 8; //data * 0x100;
+    for (int i = 0; i < 160; i++) {
+        ppu.write_oam(0xFE00 + i, read(src + i), true);
+    }
 }
 
 uint8_t Bus::wram_read(uint16_t addr){

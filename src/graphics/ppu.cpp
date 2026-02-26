@@ -42,15 +42,22 @@ void PPU::tick_dot() {
         if(STAT & 0x20) {
             requestStatInterrupt();
         }
-        oam_scan();
+        if (!oam_scanned) {
+            oam_scan();
+        }
     } else if (dots == 81) {
         set_mode(DRAW);
         pixels_pushed = 0;
-        draw_scanline();
+        if (!scanline_drawn) {
+            draw_scanline();
+        }
+
     } else if (dots == 253) {
-        set_mode(HBLANK);
-        if(STAT & 0x08) {
-            requestStatInterrupt();
+        if (!hblank_happened) {
+            set_mode(HBLANK);
+            if(STAT & 0x08) {
+                requestStatInterrupt();
+            }
         }
     }
 
@@ -87,16 +94,17 @@ void PPU::draw_scanline() {
 
 void PPU::draw_sprites_onto_scanline() {
     if (!(LCDC & 0x02)) return; // OBJ disabled
-    for (const uint32_t& sprite : sprite_buffer) {
-        uint8_t y_pos      = sprite & 0xFF;
-        uint8_t x_pos      = (sprite >> 8) & 0xFF;
-        uint8_t tile_id   = (sprite >> 16) & 0xFF;
-        uint8_t attr_flags = (sprite >> 24) & 0xFF;
+    for (const Sprite& sprite : sprite_buffer) {
+        uint8_t y_pos  = sprite.y;
+        uint8_t x_pos  = sprite.x;
+        uint8_t tile_id   = sprite.tile_id;
+        uint8_t attr_flags = sprite.attr;
 
         // Y = Object’s vertical position on the screen + 16. So for exampl
         bool y_flip = (attr_flags & 0x40) != 0;
         uint8_t sprite_row = LY - (y_pos - 16);
         uint8_t sprite_height = (LCDC & 0x04) ? 16 : 8;
+        if (sprite_height == 16) tile_id &= 0xFE;
         if (y_flip) sprite_row = (sprite_height - 1) - sprite_row;
 
         // Get tile to edit
@@ -109,11 +117,11 @@ void PPU::draw_sprites_onto_scanline() {
             uint8_t bit_idx = 7 - i;
             uint8_t b0 = (low >> bit_idx) & 1;
             uint8_t b1 = (high >> bit_idx) & 1;
-            uint8_t pixel = (b1 << 1) | b0;
+            uint8_t tile_pixel = (b1 << 1) | b0;
 
             // Do not render transparent pixels
             bool dmg_palette = (attr_flags & 0x10) != 0;
-            if (pixel == 0) continue;
+            if (tile_pixel == 0) continue;
 
             bool x_flip = (attr_flags & 0x20) != 0;
             int screen_x = x_flip ? x_pos - 8 + (7-i) : x_pos - 8 + i;
@@ -123,9 +131,10 @@ void PPU::draw_sprites_onto_scanline() {
 
             // Priority: 0 = No, 1 = BG and Window color indices 1–3 are drawn over this OBJ
             bool bg_priority = attr_flags & 0x80;
-            if (bg_priority && frame_buffer[(LY * 160) + screen_x] != 0) continue;
+            uint8_t color0_shade = BGP & 0x03;
+            if (bg_priority && frame_buffer[(LY * 160) + screen_x] != color0_shade) continue;
 
-            uint8_t color_value = dmg_palette ? map_color_id_to_color_palette(pixel, OBP1) : map_color_id_to_color_palette(pixel, OBP0);
+            uint8_t color_value = dmg_palette ? map_color_id_to_color_palette(tile_pixel, OBP1) : map_color_id_to_color_palette(tile_pixel, OBP0);
             frame_buffer[(LY * 160) + screen_x] = color_value;
         }
     }
@@ -222,21 +231,37 @@ uint8_t PPU::map_color_id_to_color_palette(uint8_t color_id, uint8_t palette) {
 
 void PPU::oam_scan() {
     sprite_buffer.clear();
-    wy_cond = (WY == LY) && window_enabled();
-    for (int byte = 0; byte < 160; byte += 4) {
+    int sprite_height= (LCDC & 0x04) ? 16 : 8;
+
+    for (int byte = 0; byte < OAM_SIZE_BYTES; byte += 4) { // 4 bytes per sprite
         uint8_t y_pos      = OAM[byte];
         uint8_t x_pos      = OAM[byte+1];
-        uint8_t tile_idx   = OAM[byte+2];
+        uint8_t tile_id    = OAM[byte+2];
         uint8_t attr_flags = OAM[byte+3];
-        int size = (LCDC & 0x04) ? 2 : 1;
-        bool in_range = LY + 16 >= y_pos && LY + 16 < y_pos + 8 * size;
-        if (in_range && sprite_buffer.size() < 10) {
-            uint32_t sprite = static_cast<uint32_t>(tile_idx) << 24 |
-                              static_cast<uint32_t>(attr_flags) << 16 |
-                              static_cast<uint32_t>(x_pos) << 8 |
-                              static_cast<uint32_t>(y_pos);
-            sprite_buffer.push_back(sprite);
+
+        // Conditions to not render sprite
+        if (x_pos == 0) continue; // Not visible
+        if (sprite_buffer.size() >= 10) continue;
+        bool on_current_line = (y_pos <= LY + 16) && (y_pos + sprite_height > LY + 16);
+        if (!on_current_line) continue;
+
+        Sprite sprite;
+        sprite.x = x_pos;
+        sprite.y = y_pos;
+        sprite.tile_id = tile_id;
+        sprite.attr = attr_flags;
+
+        // Sort. Highest priority is highest X, so we bring that to the front of the array
+        int insert_at = sprite_buffer.size();
+        for (int i = 0; i < sprite_buffer.size(); i++) {
+            if (sprite_buffer.at(i).x < sprite.x) {
+                insert_at = i;
+                break;
+            }
         }
+        sprite_buffer.insert(sprite_buffer.begin() + insert_at, sprite);
+
+
     }
     oam_scanned = true;
 }

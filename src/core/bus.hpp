@@ -32,5 +32,6 @@ class Bus {
         // IO
         uint8_t read_io(uint16_t addr);
         void write_io(uint16_t addr, uint8_t data);
+        void dma_transfer(uint8_t data);
 
 };

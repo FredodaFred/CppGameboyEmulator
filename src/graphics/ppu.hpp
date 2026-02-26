@@ -16,7 +16,6 @@ class PPU {
     public:
         PPU(Screen& screen);
         void tick(int clock_cycles);
-
         void tick_dot();
 
         void write_vram(uint16_t addr, uint8_t data);
@@ -34,6 +33,14 @@ class PPU {
         static constexpr int FRAME_BUFFER_SIZE{160*144};
     private:
         Screen& screen;
+        struct Sprite {
+            uint8_t tile_id;
+            uint8_t x;
+            uint8_t y;
+            uint8_t attr;
+        };
+
+        std::vector<Sprite> sprite_buffer;
 
         // This is the time unit. 1 clock cycle = 4 dots;
         int dots{0};
@@ -58,12 +65,13 @@ class PPU {
         bool oam_scanned{false};
         bool scanline_drawn{false};
         bool hblank_happened{false};
-        std::vector<uint32_t> sprite_buffer;
+
 
         void handle_stat_interrupt();
 
+        static constexpr uint8_t OAM_SIZE_BYTES = 0xA0; //160 byres
         /* ----- RAM ----- */
-        uint8_t OAM[0x9F] = {};
+        uint8_t OAM[OAM_SIZE_BYTES] = {};
         uint8_t VRAM[8192] = {};
 
         /* ----- PPU Registers ----- */
