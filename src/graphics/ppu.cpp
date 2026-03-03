@@ -94,11 +94,19 @@ void PPU::draw_scanline() {
 
 void PPU::draw_sprites_onto_scanline() {
     if (!(LCDC & 0x02)) return; // OBJ disabled
+
+    int prev_x = -1;
+    bool prev_x_flip = false;
     for (const Sprite& sprite : sprite_buffer) {
         uint8_t y_pos  = sprite.y;
         uint8_t x_pos  = sprite.x;
         uint8_t tile_id   = sprite.tile_id;
         uint8_t attr_flags = sprite.attr;
+        bool x_flip = (attr_flags & 0x20) != 0;
+
+        if ((sprite.x == prev_x) && (prev_x_flip == x_flip)) continue;
+        prev_x = sprite.x; //Object priority. previous x is written earlier in OAM, so at the same X coord, it gets priority over other Object
+        prev_x_flip = x_flip;
 
         // Y = Object’s vertical position on the screen + 16. So for exampl
         bool y_flip = (attr_flags & 0x40) != 0;
@@ -123,8 +131,7 @@ void PPU::draw_sprites_onto_scanline() {
             bool dmg_palette = (attr_flags & 0x10) != 0;
             if (tile_pixel == 0) continue;
 
-            bool x_flip = (attr_flags & 0x20) != 0;
-            int screen_x = x_flip ? x_pos - 8 + (7-i) : x_pos - 8 + i;
+            int screen_x = x_flip ?  x_pos - 8 + (7 - i) : x_pos - 8 + i;
 
             // Verify sprite is not hidden
             if (screen_x < 0 || screen_x >= 160) continue;
@@ -138,6 +145,40 @@ void PPU::draw_sprites_onto_scanline() {
             frame_buffer[(LY * 160) + screen_x] = color_value;
         }
     }
+}
+
+void PPU::oam_scan() {
+    sprite_buffer.clear();
+    int sprite_height= (LCDC & 0x04) ? 16 : 8;
+
+    for (int byte = 0; byte < OAM_SIZE_BYTES; byte += 4) { // 4 bytes per sprite
+        uint8_t y_pos      = OAM[byte];
+        uint8_t x_pos      = OAM[byte+1];
+        uint8_t tile_id    = OAM[byte+2];
+        uint8_t attr_flags = OAM[byte+3];
+
+        // Conditions to not render sprite
+        if (x_pos == 0) continue; // Not visible
+        if (sprite_buffer.size() >= 10) continue;
+        bool on_current_line = (y_pos <= LY + 16) && (y_pos + sprite_height > LY + 16);
+        if (!on_current_line) continue;
+
+        Sprite sprite;
+        sprite.x = x_pos;
+        sprite.y = y_pos;
+        sprite.tile_id = tile_id;
+        sprite.attr = attr_flags;
+        // Sort. Highest priority is highest X, so we bring that to the front of the array
+        int insert_at = sprite_buffer.size();
+        for (int i = 0; i < sprite_buffer.size(); i++) {
+            if (sprite_buffer.at(i).x < sprite.x) {
+                insert_at = i;
+                break;
+            }
+        }
+        sprite_buffer.insert(sprite_buffer.begin() + insert_at, sprite);
+    }
+    oam_scanned = true;
 }
 
 /**
@@ -229,44 +270,6 @@ uint8_t PPU::map_color_id_to_color_palette(uint8_t color_id, uint8_t palette) {
     }
 }
 
-void PPU::oam_scan() {
-    sprite_buffer.clear();
-    int sprite_height= (LCDC & 0x04) ? 16 : 8;
-
-    for (int byte = 0; byte < OAM_SIZE_BYTES; byte += 4) { // 4 bytes per sprite
-        uint8_t y_pos      = OAM[byte];
-        uint8_t x_pos      = OAM[byte+1];
-        uint8_t tile_id    = OAM[byte+2];
-        uint8_t attr_flags = OAM[byte+3];
-
-        // Conditions to not render sprite
-        if (x_pos == 0) continue; // Not visible
-        if (sprite_buffer.size() >= 10) continue;
-        bool on_current_line = (y_pos <= LY + 16) && (y_pos + sprite_height > LY + 16);
-        if (!on_current_line) continue;
-
-        Sprite sprite;
-        sprite.x = x_pos;
-        sprite.y = y_pos;
-        sprite.tile_id = tile_id;
-        sprite.attr = attr_flags;
-
-        // Sort. Highest priority is highest X, so we bring that to the front of the array
-        int insert_at = sprite_buffer.size();
-        for (int i = 0; i < sprite_buffer.size(); i++) {
-            if (sprite_buffer.at(i).x < sprite.x) {
-                insert_at = i;
-                break;
-            }
-        }
-        sprite_buffer.insert(sprite_buffer.begin() + insert_at, sprite);
-
-
-    }
-    oam_scanned = true;
-}
-
-
 void PPU::increment_LY() {
     LY++;
     if (LY == LYC) {
@@ -345,10 +348,7 @@ void PPU::write_vram(uint16_t addr, uint8_t data) {
 }
 
 uint8_t PPU::read_vram(uint16_t addr) {
-        if (mode == DRAW) {
-        // return garbage data if drawing to ignore
-        return 0xFF;
-    }
+
     return VRAM[addr - 0x8000];
 }
 
@@ -357,16 +357,16 @@ uint8_t PPU::read_vram_internal(uint16_t addr) {
 }
 
 void PPU::write_oam(uint16_t addr, uint8_t data, bool dma) {
-    if ((mode == DRAW | mode == OAM_SCAN) && !dma) {
-        return;
-    }
+    // if ((mode == DRAW || mode == OAM_SCAN) && !dma) {
+    //     return;
+    // }
     OAM[addr - 0xFE00] = data;
 }
 
 
 uint8_t PPU::read_oam(uint16_t addr, bool dma) {
-    if ((mode == DRAW | mode == OAM_SCAN) && !dma)  {
-        return 0xFF;
-    }
+    // if ((mode == DRAW || mode == OAM_SCAN) && !dma)  {
+    //     return 0xFF;
+    // }
     return OAM[addr - 0xFE00];
 }

@@ -52,3 +52,13 @@ target_link_libraries(GameBoyCpp
 if(APPLE)
     target_link_libraries(Core PUBLIC "-framework OpenGL" "-framework Cocoa" "-framework IOKit")
 endif()
+
+target_compile_options(GameBoyCpp PRIVATE
+        -Wall
+        -Wextra
+        -Wuninitialized
+        -Wshadow
+        -Wreturn-type
+        -Wunused-value
+        -Wparentheses
+)
