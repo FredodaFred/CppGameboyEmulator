@@ -1,5 +1,7 @@
 #include "screen.hpp"
 
+#include "joypad/joypad.hpp"
+
 void Screen::tick() {
     glfwPollEvents();
 }
@@ -63,7 +65,7 @@ void Screen::draw_pixel_to_buffer(uint8_t* curr_pixels, int idx, uint8_t pixel) 
     curr_pixels[idx + 2] = color.b; // B
 }
 
-void Screen::init() {
+GLFWwindow* Screen::init() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -111,6 +113,9 @@ void Screen::init() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
     compile_shaders();
+    glfwSetKeyCallback(window, Joypad::key_callback);
+
+    return window;
 }
 
 void Screen::close() {

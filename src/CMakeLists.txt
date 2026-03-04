@@ -13,10 +13,14 @@ add_library(Core STATIC
     core/timer.cpp
     core/timer.hpp
 
+    joypad/joypad.cpp
+    joypad/joypad.hpp
+
     log/logger.hpp
     log/logger.cpp
 
     ${GLAD_SRC}
+
     graphics/screen.cpp
     graphics/screen.hpp
     graphics/ppu.cpp
@@ -24,9 +28,9 @@ add_library(Core STATIC
 )
 
 target_include_directories(Core PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/external/include
-        /opt/homebrew/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/external/include
+    /opt/homebrew/include
 )
 
 add_executable(GameBoyCpp
@@ -39,22 +43,8 @@ find_package(OpenGL REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 
 target_link_libraries(Core PUBLIC OpenGL::GL glfw)
-
-target_link_libraries(GameBoyCpp
-    PRIVATE
-        Core
-)
+target_link_libraries(GameBoyCpp PRIVATE Core)
 
 if(APPLE)
     target_link_libraries(Core PUBLIC "-framework OpenGL" "-framework Cocoa" "-framework IOKit")
 endif()
-
-target_compile_options(GameBoyCpp PRIVATE
-        -Wall
-        -Wextra
-        -Wuninitialized
-        -Wshadow
-        -Wreturn-type
-        -Wunused-value
-        -Wparentheses
-)

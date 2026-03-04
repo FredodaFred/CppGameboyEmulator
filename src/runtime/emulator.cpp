@@ -28,6 +28,12 @@ void Emulator::tick() {
         bus.write(0xFF0F, if_val | Interrupt::TIMER);
         timer.interrupt = false;
     }
+
+    if (Joypad::interrupt) {
+        uint8_t if_val = bus.read(0xFF0F);
+        bus.write(0xFF0F, if_val | Interrupt::JOYPAD);
+        Joypad::interrupt = false;
+    }
 }
 
 void Emulator::run() {

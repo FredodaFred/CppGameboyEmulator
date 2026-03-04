@@ -2,6 +2,7 @@
 #include <cstdint>
 #include "cart.hpp"
 #include "../graphics/ppu.hpp"
+#include "../joypad/joypad.hpp"
 #include "timer.hpp"
 
 class Bus {

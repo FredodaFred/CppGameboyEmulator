@@ -10,7 +10,7 @@
 class Screen {
     public:
         Screen() = default;
-        void init();
+        GLFWwindow* init();
         void close();
         void render(const uint8_t *frame_buffer, int size);
         void tick();

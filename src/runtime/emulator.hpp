@@ -4,6 +4,7 @@
 #include "../core/timer.hpp"
 #include "../graphics/ppu.hpp"
 #include "../graphics/screen.hpp"
+#include "../joypad/joypad.hpp"
 
 class Emulator {
     public:

@@ -3,6 +3,7 @@
 #include "../core/cart.hpp"
 #include "../core/cpu.hpp"
 #include "../core/registers.hpp"
+#include <GLFW/glfw3.h>
 #include "emulator.hpp"
 
 Cart loadCart(std::string romPath) {
@@ -29,22 +30,25 @@ int main(int argc, char* argv[]) {
         Logger::set_enabled(true);
     }
 
-
     // Load game
     Cart cart = loadCart(romPath);
     Logger::log_cart_header(cart);
 
     //Setup classes
-    Registers registers;
     Screen screen;
     screen.init();
     PPU ppu (screen);
+
+
+
     Timer timer;
     Bus bus(cart, ppu, timer);
+
+    Registers registers;
     CPU cpu(bus, registers);
 
     Emulator emulator(cpu, bus, timer, ppu, screen);
-    
+
     try {
         emulator.run();
     } catch (const std::runtime_error& e) {
