@@ -3,7 +3,7 @@
 using namespace std;
 
 bool Joypad::KEYS = false;
-bool Joypad::D_PAD  = true;
+bool Joypad::D_PAD  = false;
 bool Joypad::interrupt = false;
 bool Joypad::UP_PRESSED = false;
 bool Joypad::DOWN_PRESSED = false;
@@ -16,47 +16,41 @@ bool Joypad::SELECT_PRESSED = false;
 
 void Joypad::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) {
-        if (D_PAD) { // Select D-Pad
-            switch (key) {
-                case (GLFW_KEY_RIGHT):
-                    Joypad::RIGHT_PRESSED = true;
-                    interrupt = true;
-                    break;
-                case (GLFW_KEY_LEFT):
-                    Joypad::LEFT_PRESSED = true;
-                    interrupt = true;
-                    break;
-                case (GLFW_KEY_UP):
-                    Joypad::UP_PRESSED = true;
-                    interrupt = true;
-                    break;
-                case (GLFW_KEY_DOWN):
-                    Joypad::DOWN_PRESSED = true;
-                    interrupt = true;
-                    break;
-            }
-        }
-        if (KEYS) {
-            switch (key) {
-                case (GLFW_KEY_A):  // Let's map A to A
-                    Joypad::A_PRESSED = true;
-                    interrupt = true;
-                    break;
-                case (GLFW_KEY_S): // Let's map S to B
-                    Joypad::B_PRESSED = true;
-                    interrupt = true;
-                    break;
-                case (GLFW_KEY_D): // D to Select
-                    Joypad::SELECT_PRESSED = true;
-                    interrupt = true;
-                    break;
-                case (GLFW_KEY_F): // F to Start
-                    Joypad::START_PRESSED = true;
-                    interrupt = true;
-                    break;
-            }
-        }
+        switch (key) {
+            case (GLFW_KEY_RIGHT):
+                Joypad::RIGHT_PRESSED = true;
+                interrupt = true;
+                break;
+            case (GLFW_KEY_LEFT):
+                Joypad::LEFT_PRESSED = true;
+                interrupt = true;
+                break;
+            case (GLFW_KEY_UP):
+                Joypad::UP_PRESSED = true;
+                interrupt = true;
+                break;
+            case (GLFW_KEY_DOWN):
+                Joypad::DOWN_PRESSED = true;
+                interrupt = true;
+                break;
+            case (GLFW_KEY_A):  // Let's map A to A
+                Joypad::A_PRESSED = true;
+                interrupt = true;
+                break;
+            case (GLFW_KEY_S): // Let's map S to B
+                Joypad::B_PRESSED = true;
+                interrupt = true;
+                break;
+            case (GLFW_KEY_D): // D to Select
+                Joypad::SELECT_PRESSED = true;
+                interrupt = true;
+                break;
+            case (GLFW_KEY_F): // F to Start
+                Joypad::START_PRESSED = true;
+                interrupt = true;
+                break;
 
+        }
     } else if (action == GLFW_RELEASE) {
         switch (key) {
             case (GLFW_KEY_A):

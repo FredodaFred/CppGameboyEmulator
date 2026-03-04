@@ -113,8 +113,8 @@ void Bus::hram_write(uint16_t addr, uint8_t data){
 void Bus::write_io(uint16_t addr, uint8_t data) {
     if ( addr == 0xFF00) {
         //The lower nibble is Read-only
-        Joypad::D_PAD = ~(data & 0x10);
-        Joypad::KEYS = ~(data & 0x20);
+        Joypad::D_PAD = !(data & 0x10);
+        Joypad::KEYS = !(data & 0x20);
     } else if (addr == 0xFF01) {
         serial_data[0] = data;
         std::cout << data; //Prints for debugging / BLAARG testts
