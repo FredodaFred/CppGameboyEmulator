@@ -1,7 +1,7 @@
 #include "emulator.hpp"
 
-Emulator::Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen, DbgWindow& dbg_window)
-    : cpu(cpu), bus(bus), timer(timer), ppu(ppu), screen(screen), dbg_window(dbg_window)
+Emulator::Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen)
+    : cpu(cpu), bus(bus), timer(timer), ppu(ppu), screen(screen)
 {}
 
 void Emulator::tick() {

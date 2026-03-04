@@ -2,7 +2,7 @@
 #include <cstdint>
 #include "cart.hpp"
 #include "../graphics/ppu.hpp"
-#include "../io/timer.hpp"
+#include "timer.hpp"
 
 class Bus {
     public:

@@ -63,12 +63,13 @@ void Logger::log_cart_header(Cart& cart) {
     file_stream << "--- Cartridge Header ---\n";
     file_stream << std::format("Title:         {}\n", cleanTitle);
     
-    file_stream << std::format("ROM Size:      {} ({} KB)\n", (int)cart.rom_size, 32 << cart.rom_size);
+    file_stream << std::format("ROM Size:      {} ({} KB)\n", cart.rom_size, 32 << cart.rom_size);
     
     file_stream << std::format("RAM Size Code: {}\n", (int)cart.ram_size);
     
     file_stream << std::format("Version:       {}\n", (int)cart.version);
     file_stream << std::format("Licensee:      0x{:02X}\n", (int)cart.licenseeCode);
+    file_stream << std::format("MBC:      0x{:02X}\n", (int)cart.cart_type);
 }
 
 string Logger::get_readable(uint8_t opcode) {

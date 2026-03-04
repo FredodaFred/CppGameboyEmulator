@@ -10,21 +10,17 @@ add_library(Core STATIC
     core/bus.hpp
     core/registers.cpp
     core/registers.hpp
+    core/timer.cpp
+    core/timer.hpp
 
     log/logger.hpp
     log/logger.cpp
 
-    io/timer.cpp
-    io/timer.hpp
-
     ${GLAD_SRC}
-
     graphics/screen.cpp
     graphics/screen.hpp
     graphics/ppu.cpp
     graphics/ppu.hpp
-        graphics/dbg_window.cpp
-        graphics/dbg_window.hpp
 )
 
 target_include_directories(Core PUBLIC

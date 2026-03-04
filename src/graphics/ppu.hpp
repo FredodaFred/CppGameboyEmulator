@@ -70,9 +70,10 @@ class PPU {
         void handle_stat_interrupt();
 
         static constexpr uint8_t OAM_SIZE_BYTES = 0xA0; //160 byres
+        static constexpr uint16_t VRAM_SIZE_BYTES = 0x2000; //8192
         /* ----- RAM ----- */
         uint8_t OAM[OAM_SIZE_BYTES] = {};
-        uint8_t VRAM[8192] = {};
+        uint8_t VRAM[VRAM_SIZE_BYTES] = {};
 
         /* ----- PPU Registers ----- */
         // We initialize them to what's after the powerup sequence

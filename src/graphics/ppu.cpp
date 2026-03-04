@@ -13,7 +13,6 @@ void PPU::tick(int cycles) {
 
 void PPU::tick_dot() {
     dots++;
-
     if (LY >= 144) {
         if (dots == 1 && LY == 144) {
             set_mode(VBLANK);
@@ -140,7 +139,6 @@ void PPU::draw_sprites_onto_scanline() {
             bool bg_priority = attr_flags & 0x80;
             uint8_t color0_shade = BGP & 0x03;
             if (bg_priority && frame_buffer[(LY * 160) + screen_x] != color0_shade) continue;
-
             uint8_t color_value = dmg_palette ? map_color_id_to_color_palette(tile_pixel, OBP1) : map_color_id_to_color_palette(tile_pixel, OBP0);
             frame_buffer[(LY * 160) + screen_x] = color_value;
         }
