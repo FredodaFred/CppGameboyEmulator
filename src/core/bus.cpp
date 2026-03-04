@@ -1,7 +1,7 @@
 #include "bus.hpp"
 
-Bus::Bus(Cart& cart, PPU& ppu, Timer& timer)
-    : cart(cart), ppu(ppu), timer(timer)
+Bus::Bus(Cart& cart, PPU& ppu, Timer& timer, APU& apu)
+    : cart(cart), ppu(ppu), timer(timer), apu(apu)
 {}
 
 // 0x0000 - 0x3FFF : ROM Bank 0
@@ -124,6 +124,8 @@ void Bus::write_io(uint16_t addr, uint8_t data) {
         timer.write_timer(addr, data);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         ppu.ppu_io_registers_write(addr, data);
+    } else if (addr >= 0xFF10 && addr <= 0xFF35) {
+        apu.apu_io_write(addr, data);
     }
 }
 
@@ -138,6 +140,8 @@ uint8_t Bus::read_io(uint16_t addr) {
         return timer.read_timer(addr);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         return ppu.ppu_io_read(addr);
+    } else if (addr >= 0xFF10 && addr <= 0xFF35) {
+        return apu.apu_io_read(addr);
     }
 
     printf("WARNING: unhandled IO read at 0x%04X\n", addr);

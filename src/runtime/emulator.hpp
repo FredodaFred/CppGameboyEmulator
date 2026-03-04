@@ -8,7 +8,7 @@
 
 class Emulator {
     public:
-        Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen);
+        Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen, APU& apu);
         void run();
     private:
         CPU& cpu;
@@ -16,6 +16,7 @@ class Emulator {
         Timer& timer;
         PPU& ppu;
         Screen& screen;
+        APU& apu;
 
         void tick();
 };

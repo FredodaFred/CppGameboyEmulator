@@ -25,6 +25,13 @@ add_library(Core STATIC
     graphics/screen.hpp
     graphics/ppu.cpp
     graphics/ppu.hpp
+
+    audio/apu.cpp
+    audio/apu.hpp
+    audio/speaker.cpp
+    audio/speaker.hpp
+    audio/channel1.cpp
+    audio/channel1.hpp
 )
 
 target_include_directories(Core PUBLIC
@@ -41,10 +48,22 @@ add_executable(GameBoyCpp
 
 find_package(OpenGL REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
-
-target_link_libraries(Core PUBLIC OpenGL::GL glfw)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDL2 REQUIRED sdl2)
+target_include_directories(Core PUBLIC ${SDL2_INCLUDE_DIRS})
+target_link_directories(Core PUBLIC ${SDL2_LIBRARY_DIRS})
+target_link_libraries(Core PUBLIC OpenGL::GL glfw ${SDL2_LIBRARIES})
 target_link_libraries(GameBoyCpp PRIVATE Core)
 
 if(APPLE)
-    target_link_libraries(Core PUBLIC "-framework OpenGL" "-framework Cocoa" "-framework IOKit")
+    target_link_libraries(Core PUBLIC
+            "-framework OpenGL"
+            "-framework Cocoa"
+            "-framework IOKit"
+    )
+
+    set_target_properties(GameBoyCpp PROPERTIES
+            BUILD_RPATH "/opt/homebrew/lib"
+            INSTALL_RPATH "/opt/homebrew/lib"
+    )
 endif()

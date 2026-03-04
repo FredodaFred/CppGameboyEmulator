@@ -32,7 +32,6 @@ void PPU::tick_dot() {
                 screen.render(frame_buffer, FRAME_BUFFER_SIZE);
             }
         }
-
         return;
     }
 
@@ -75,8 +74,8 @@ void PPU::draw_scanline() {
     bool window_triggered_on_line = false;
     window_pixels_pushed = 0;
 
-    while (pixels_pushed < 160) {
-        if (window_possible && pixels_pushed >= (WX - 7)) {
+    while (pixels_pushed <= 160) {
+        if (window_possible && (pixels_pushed >= (WX - 7))) {
             window_triggered_on_line = true;
         }
         uint8_t tile_id = get_tile_map_address(window_triggered_on_line, window_pixels_pushed);
@@ -189,7 +188,7 @@ uint8_t PPU::get_tile_map_address(bool window_rendering, uint8_t window_pixels_p
 
     if (window_rendering) {
         tile_map_addr = get_window_tile_map() ? 0x9C00 : 0x9800;
-        x_pos = window_pixels_pushed / 8;
+        x_pos =  (window_pixels_pushed / 8)  & 0x1F;
         y_pos = window_internal_line_counter;
     } else {
         tile_map_addr = get_bg_tile_map() ? 0x9C00 : 0x9800;
@@ -241,7 +240,8 @@ void PPU::tile_data_to_pixels(bool window_rendering, uint16_t tile_data) {
         uint8_t b1 = (high >> bit_idx) & 1;
         uint8_t pixel = (b1 << 1) | b0;
 
-        int screen_x = pixels_pushed - (SCX % 8);
+        int screen_x = window_rendering ?  (WX - 7) + window_pixels_pushed : pixels_pushed - (SCX % 8);
+
         // Only write to the buffer if the pixel is actually visible on screen
         if (screen_x >= 0 && screen_x < 160) {
             int buffer_index = (LY * 160) + screen_x;
@@ -250,8 +250,8 @@ void PPU::tile_data_to_pixels(bool window_rendering, uint16_t tile_data) {
             } else {
                frame_buffer[buffer_index] = map_color_id_to_color_palette(pixel, BGP);
             }
-
         }
+
         pixels_pushed++;
         if (window_rendering) {
             window_pixels_pushed++;

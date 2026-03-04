@@ -4,10 +4,11 @@
 #include "../graphics/ppu.hpp"
 #include "../joypad/joypad.hpp"
 #include "timer.hpp"
+#include "../audio/apu.hpp"
 
 class Bus {
     public:
-        Bus(Cart& cart, PPU& ppu, Timer& timer);
+        Bus(Cart& cart, PPU& ppu, Timer& timer, APU& apu);
         uint8_t read(uint16_t addr);
         void write(uint16_t addr, uint8_t data);
 
@@ -15,6 +16,7 @@ class Bus {
         Cart& cart;
         PPU& ppu;
         Timer& timer;
+        APU& apu;
 
         // Flags 
         // https://gbdev.io/pandocs/Interrupts.html#ffff--ie-interrupt-enable

@@ -5,6 +5,7 @@
 #include "../core/registers.hpp"
 #include <GLFW/glfw3.h>
 #include "emulator.hpp"
+#include "audio/apu.hpp"
 
 Cart loadCart(std::string romPath) {
     Cart cart;
@@ -38,16 +39,15 @@ int main(int argc, char* argv[]) {
     Screen screen;
     screen.init();
     PPU ppu (screen);
-
-
+    APU apu;
 
     Timer timer;
-    Bus bus(cart, ppu, timer);
+    Bus bus(cart, ppu, timer, apu);
 
     Registers registers;
     CPU cpu(bus, registers);
 
-    Emulator emulator(cpu, bus, timer, ppu, screen);
+    Emulator emulator(cpu, bus, timer, ppu, screen, apu);
 
     try {
         emulator.run();

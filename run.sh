@@ -1,1 +1,1 @@
-./build/src/GameBoyCpp ./roms/01-special.gb
+./build/src/GameBoyCpp ./roms/Pokemon_Red.gb

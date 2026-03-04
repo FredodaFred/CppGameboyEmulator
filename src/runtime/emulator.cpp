@@ -1,7 +1,7 @@
 #include "emulator.hpp"
 
-Emulator::Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen)
-    : cpu(cpu), bus(bus), timer(timer), ppu(ppu), screen(screen)
+Emulator::Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen, APU& apu)
+    : cpu(cpu), bus(bus), timer(timer), ppu(ppu), screen(screen), apu(apu)
 {}
 
 void Emulator::tick() {
@@ -11,6 +11,7 @@ void Emulator::tick() {
     ppu.tick(cycles);
     screen.tick();
     timer.tick(cycles);
+    apu.tick(cycles);
 
     //Handle interrupt requests from components
     if (ppu.vblank_interrupt) {
