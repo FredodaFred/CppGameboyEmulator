@@ -4,16 +4,32 @@ Emulator::Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen, A
     : cpu(cpu), bus(bus), timer(timer), ppu(ppu), screen(screen), apu(apu)
 {}
 
+void Emulator::run() {
+    while (!glfwWindowShouldClose(screen.window)) {
+        int cycles_this_frame = 0;
+        while (cycles_this_frame < M_CYCLES_PER_FRAME) {
+            this->tick();
+            cycles_this_frame++;
+        }
+        screen.tick();
+    }
+}
+
 void Emulator::tick() {
-    uint8_t cycles = cpu.step();
+    uint8_t m_cycles = cpu.step();
         
     // all other components sync
-    ppu.tick(cycles);
-    screen.tick();
-    timer.tick(cycles);
-    apu.tick(cycles);
+    bool apu_div_tick = timer.tick(m_cycles);
+    ppu.tick(m_cycles);
+    apu.tick(m_cycles, apu_div_tick);
 
-    //Handle interrupt requests from components
+    handle_isr();
+}
+
+/**
+ * Interrupt Handler
+ */
+void Emulator::handle_isr() {
     if (ppu.vblank_interrupt) {
         uint8_t if_val = bus.read(0xFF0F);
         bus.write(0xFF0F, if_val | Interrupt::VBLANK);
@@ -34,12 +50,6 @@ void Emulator::tick() {
         uint8_t if_val = bus.read(0xFF0F);
         bus.write(0xFF0F, if_val | Interrupt::JOYPAD);
         Joypad::interrupt = false;
-    }
-}
-
-void Emulator::run() {
-    while (true) {
-        this->tick();
     }
 }
  

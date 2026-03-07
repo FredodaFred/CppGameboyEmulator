@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 #include "emulator.hpp"
 #include "audio/apu.hpp"
+#include "audio/speaker.hpp"
 
 Cart loadCart(std::string romPath) {
     Cart cart;
@@ -39,7 +40,9 @@ int main(int argc, char* argv[]) {
     Screen screen;
     screen.init();
     PPU ppu (screen);
-    APU apu;
+    Speaker speaker;
+    APU apu(speaker);
+    apu.init();
 
     Timer timer;
     Bus bus(cart, ppu, timer, apu);

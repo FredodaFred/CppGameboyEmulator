@@ -19,7 +19,6 @@ void PPU::tick_dot() {
             vblank_interrupt = true;
             window_internal_line_counter = 0;
         }
-
         if (dots >= 456) {
             dots = 0;
             increment_LY();
@@ -138,6 +137,7 @@ void PPU::draw_sprites_onto_scanline() {
             bool bg_priority = attr_flags & 0x80;
             uint8_t color0_shade = BGP & 0x03;
             if (bg_priority && frame_buffer[(LY * 160) + screen_x] != color0_shade) continue;
+            if (tile_pixel == 0) continue;
             uint8_t color_value = dmg_palette ? map_color_id_to_color_palette(tile_pixel, OBP1) : map_color_id_to_color_palette(tile_pixel, OBP0);
             frame_buffer[(LY * 160) + screen_x] = color_value;
         }

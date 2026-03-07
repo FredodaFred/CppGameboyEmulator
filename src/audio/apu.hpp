@@ -2,21 +2,28 @@
 #include <cstdint>
 #include <SDL2/SDL_audio.h>
 #include "channel1.hpp"
+#include "speaker.hpp"
 
 class APU {
     public:
+        APU(Speaker& speaker);
         uint8_t apu_io_read(uint16_t addr);
         void apu_io_write(uint16_t addr, uint8_t data);
         void init();
-        void tick(int cycle);
+        void tick(int cycle, bool apu_div_tick);
 
         // 87 M Cycles = 4,194,304 Hz / Cycles ÷ 48,000 HZ (sample rate we desire)
-        static constexpr int SAMPLE_RATE = 87;
-
+        static constexpr float SAMPLE_RATE = 87.38;
+        static constexpr int MAX_CHANNEL_VOL_FACTOR = 500;
 
     private:
+        Speaker& speaker;
         void tick_cycle();
-        int sample_timer{0};
+
+        void mix_and_sample();
+
+        float sample_accumulator{0};
+        uint8_t apu_div{0};
 
         uint8_t WAVE_RAM[16]; // 16 byte ram
 
@@ -45,30 +52,9 @@ class APU {
         uint8_t nr50{0x77};
         uint8_t nr51{0xF3};
         uint8_t nr52{0xF1};
-
-
-        void toggleDACs();
-
-        void trigger_channel1();
-        void play_channel1();
-
-        void trigger_channel2();
-
-        double get_wave_duty(uint8_t nrx1);
-
-        uint8_t get_initial_timer_length(uint8_t nrx1);
+    ;
 
         bool check_master_enable() const;
 
         void mixer();
-
-        bool DAC1{true};
-        bool DAC2{true};
-        bool DAC3{true};
-        bool DAC4{true};
-
-        bool ch1_enable{false};
-        bool ch2_enable{false};
-        bool ch3_enable{false};
-        bool ch4_enable{false};
 };

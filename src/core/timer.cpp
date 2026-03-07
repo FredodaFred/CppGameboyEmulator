@@ -2,13 +2,14 @@
 
 #include <stdexcept>
 
-// NOTE 16384hz = 64 M (or clock_cycles)
 
-void Timer::tick(int clock_cycles) {
-    tick_div(clock_cycles + div_remainder);
+bool Timer::tick(int clock_cycles) {
+    bool apu_div_tick = tick_div(clock_cycles + div_remainder);
     if (TAC & 0x04) {
         tick_tima(clock_cycles + tima_remainder);
     }
+
+    return apu_div_tick;
 }
 
 void Timer::tick_tima(int clock_cycles) {
@@ -43,9 +44,29 @@ void Timer::tick_tima(int clock_cycles) {
     }
 }
 
-void Timer::tick_div(int clock_cycles) {
-    DIV += clock_cycles / 64;
-    div_remainder = clock_cycles % 64;
+/**
+ * 1048576Hz is 1 M cycle
+ * The timer increments every 16384Hz
+ * 16384hz = 64 M (or clock_cycles)
+ * Essentially, DIV will increment once every 64 M cycles
+ * @returns apu_div_tick
+ */
+bool Timer::tick_div(int clock_cycles) {
+    int total_cycles = clock_cycles + div_remainder;
+
+    // This indicates our div will actually increment, so now we should to see if apu_div should be updated.
+    // We check that be seeing if bit 4 ( 0b00010000) changed from 1 to 0
+    if (total_cycles >= 64) {
+        bool div_bit4_0 = DIV & 0b00010000;
+        DIV++;
+        bool div_bit4_1 = DIV & 0b00010000;
+        if (div_bit4_0 && !div_bit4_1) {
+            return true;
+        }
+    }
+
+    div_remainder = total_cycles % 64;
+    return false;
 }
 
 void Timer::write_timer(uint16_t addr, uint8_t data) {

@@ -6,13 +6,11 @@ void Screen::tick() {
     glfwPollEvents();
 }
 
-
 /**
  *  left -> right in an uint16_t. this draws 8 pixels to screen, each 2 bit value being a color
  * 0b 11 10 01 01 11 10 01 10
  *
  */
-
 void Screen::render(const uint8_t* frame_buffer, const int size) {
     glfwMakeContextCurrent(window);
     // "summon" the PBO and it's stored pixels
@@ -21,48 +19,32 @@ void Screen::render(const uint8_t* frame_buffer, const int size) {
         return;
     }
 
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo_id);
-    uint8_t* curr_pixels = (uint8_t*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
-    if (!curr_pixels) {
-        std::cerr << "PBO Mapping failed! OpenGL Error: " << glGetError() << std::endl;
-        return;
-    }
-    int curr_pixels_index = 0;
-
-    // i is 8 pixels,
+    uint8_t pixels[160 * 144 * 3];
     for (int i = 0; i < size; i++) {
-        uint8_t pixel = frame_buffer[i];
-        draw_pixel_to_buffer(curr_pixels, curr_pixels_index, pixel);
-        curr_pixels_index += 3;
+        int idx = i * 3;
+        uint8_t color = frame_buffer[i];
+        pixels[idx + 0] = rgb_palette[color][0];
+        pixels[idx + 1] = rgb_palette[color][1];
+        pixels[idx + 2] = rgb_palette[color][2];
     }
 
-    glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+    // ===== FAST UPLOAD (NO MAPPING) =====
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo_id);
+    glBufferSubData(GL_PIXEL_UNPACK_BUFFER, 0, 160 * 144 * 3, pixels);
 
-    // 1. Clear the screen
+    // ===== REST IS SAME =====
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // 2. Setup the "Draw"
     glUseProgram(shader_program);
-    glBindVertexArray(vao); // Use the quad we built in init
+    glBindVertexArray(vao);
     glBindTexture(GL_TEXTURE_2D, texture_id);
 
-    // 3. Move PBO data to Texture and Draw
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 160, 144, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    // 4. Show the frame
     glfwSwapBuffers(window);
     glfwPollEvents();
-}
-
-// Each pixel is RGB = 3 bytes
-void Screen::draw_pixel_to_buffer(uint8_t* curr_pixels, int idx, uint8_t pixel) {
-    //     loc in normal buff times 3 bc each pixel is 3 bytes
-    RGB color = value_to_rgb(pixel);
-    curr_pixels[idx + 0] = color.r; // R
-    curr_pixels[idx + 1] = color.g; // G
-    curr_pixels[idx + 2] = color.b; // B
 }
 
 GLFWwindow* Screen::init() {
@@ -114,23 +96,12 @@ GLFWwindow* Screen::init() {
     glEnableVertexAttribArray(1);
     compile_shaders();
     glfwSetKeyCallback(window, Joypad::key_callback);
-
     return window;
 }
 
 void Screen::close() {
     glfwDestroyWindow(window);
     glfwTerminate();
-}
-
-Screen::RGB Screen::value_to_rgb(uint8_t pixel) {
-    switch (pixel) {
-        case 0: return RGB(255, 255, 255); /// white
-        case 1: return RGB(211, 211, 211); // light gray
-        case 2: return RGB(169, 169, 169); // dark gray
-        case 3: return RGB(0, 0, 0); // dark
-        default: std::runtime_error("Unknown pixel");
-    }
 }
 
 // Thanks gemini...

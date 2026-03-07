@@ -32,6 +32,8 @@ add_library(Core STATIC
     audio/speaker.hpp
     audio/channel1.cpp
     audio/channel1.hpp
+    audio/channel2.cpp
+    audio/channel2.hpp
 )
 
 target_include_directories(Core PUBLIC

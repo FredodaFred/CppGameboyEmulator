@@ -2,7 +2,18 @@
 
 #include <stdexcept>
 
-// NOTE 1 M (clock cycle) = 256hz
+/**
+ * To do our calculations for the channels, we need to translate M cycles to Hz.
+ *
+ * 1 M-Cycle runs at the frequency of the System clock.
+ * Therefore 1048576 hz is one M Cycle
+ *
+ * https://gbdev.io/pandocs/Specifications.html#dmg_clk
+ * https://oh4.co/site/gameboy.html
+ */
+
+
+APU::APU(Speaker& speaker) : speaker(speaker) {};
 
 void APU::init() {
     //write values for PC = 0x0100
@@ -11,22 +22,44 @@ void APU::init() {
     channel1.write_nr12(0xF3);
     channel1.write_nr13(0xFF);
     channel1.write_nr14(0xBF);
+    speaker.init();
 }
 
-void APU::tick(int cycle) {
+void APU::tick(int cycle, bool apu_div_tick) {
+    if (apu_div_tick) apu_div++;
+
+    bool enabled = check_master_enable();
+    if (!enabled) {
+        speaker.pause();
+    } else {
+        speaker.unpause();
+    }
+
     for (int i = 0; i < cycle; i++) {
         tick_cycle();
     }
 }
 
 void APU::tick_cycle() {
-    // uint8_t ch1_sample = channel1.sample();
-    // mixer(); // mixes samples form all 4 channels
-    // //speaker.play()
-    sample_timer++;
-    if (sample_timer == SAMPLE_RATE) {
-        sample_timer = 0;
+
+    // collect samples
+     sample_accumulator += 1.0;
+    if (sample_accumulator >= SAMPLE_RATE) {
+        mix_and_sample();
+        sample_accumulator -=  SAMPLE_RATE;
     }
+}
+
+void APU::mix_and_sample() {
+    int16_t left_stereo = 0;
+    int16_t right_stereo = 0;
+    int16_t ch1_sample = channel1.sample();
+
+    // Check NR51 for left and right enables
+    if (nr51 & 0x10) left_stereo += ch1_sample; // Bit 4: Ch1 Left
+    if (nr51 & 0x01) right_stereo += ch1_sample; // Bit 0: Ch1 Right
+    speaker.play_sample(left_stereo, right_stereo);
+
 }
 
 uint8_t APU::apu_io_read(uint16_t addr) {
@@ -76,7 +109,7 @@ void APU::apu_io_write(uint16_t addr, uint8_t data) {
         case 0xFF16: nr21 = data; break;
         case 0xFF17: nr22 = data; break;
         case 0xFF18: nr23 = data; break;
-        case 0xFF19: nr24 = data; if (nr24 & 0x80) trigger_channel2(); break;
+        case 0xFF19: nr24 = data; if (nr24 & 0x80) break;
 
         case 0xFF1A: nr30 = data; break;
         case 0xFF1B: nr31 = data; break;
@@ -98,39 +131,6 @@ void APU::apu_io_write(uint16_t addr, uint8_t data) {
     if (addr  >= 0xFF30 && addr <= 0xFF3F) {
         WAVE_RAM[addr - 0xFF30] = data;
     }
-}
-
-void APU::toggleDACs() {
-    DAC2 = (nr22 & 0xF8) != 0;
-    DAC3 = (nr30 & 0x20) != 0; // bit 7 of nr30 instead
-    DAC4 = (nr42 & 0xF8) != 0;
-}
-
-/**
-* Trigger (Write-only): Writing any value to NR14 with this bit set triggers the channel, causing the following to occur:
-
-    Ch1 is enabled.
-    If length timer expired it is reset.
-    The period divider is set to the contents of NR13 and NR14.
-    Envelope timer is reset.
-    Volume is set to contents of NR12 initial volume.
-    Sweep does several things.
-    Length enable (Read/Write): Takes effect immediately upon writing to this register.
-
-    Period (Write-only): The upper 3 bits of the period value; the lower 8 bits are stored in NR13.
-
- */
-void APU::trigger_channel1() {
-    ch1_enable = true;
-}
-void APU::play_channel1() {
-    if (DAC1 && ch1_enable && check_master_enable()) { // length master checks
-        //speaker play ()
-    }
-}
-
-void APU::trigger_channel2() {
-    ch2_enable = true;
 }
 
 bool APU::check_master_enable() const {

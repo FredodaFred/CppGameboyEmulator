@@ -6,7 +6,8 @@ class Timer {
     public:
         void write_timer(uint16_t addr, uint8_t data);
         uint8_t read_timer(uint16_t addr);
-        void tick(int clock_cycles);
+
+        bool tick(int clock_cycles);
         //This will request and interrupt
         bool interrupt = false;
     private:
@@ -19,5 +20,6 @@ class Timer {
         int div_remainder{0};
         int tima_overflow_pending = 0;
         void tick_tima(int clock_cycles);
-        void tick_div(int clock_cycles);
+
+        bool tick_div(int clock_cycles);
 };
