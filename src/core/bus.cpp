@@ -121,7 +121,8 @@ void Bus::write_io(uint16_t addr, uint8_t data) {
     } else if (addr == 0xFF02) {
         serial_data[1] = data;
     } else if (addr >= 0xFF04 && addr < 0xFF08) {
-        timer.write_timer(addr, data);
+        bool apu_div_tick = timer.write_timer(addr, data);
+        if (apu_div_tick) apu.apu_div++;
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         ppu.ppu_io_registers_write(addr, data);
     } else if (addr >= 0xFF10 && addr <= 0xFF35) {

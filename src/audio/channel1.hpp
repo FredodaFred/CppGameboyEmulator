@@ -4,6 +4,7 @@
 
 #define LENGTH_TIMER_MAX 64
 #define LENGTH_TIMER_M_CYCLES_TICK_RATE 4096
+#define ENV_RATE_M_CYCLES 16384
 
 class Channel1 {
 
@@ -33,7 +34,9 @@ class Channel1 {
 
         void length_timer_tick();
 
-        void period_tick();
+        void period_sweep_tick();
+
+        void volume_envelope_tick();
 
         bool DAC{true};
         bool enabled = true;
@@ -54,8 +57,10 @@ class Channel1 {
         uint8_t initial_volume;
         uint8_t current_volume;
 
-        bool env_dir;
-        uint8_t sweep_pace;
+        int env_dir;
+        uint8_t env_sweep_pace;
+        int internal_m_cycle_counter_env = 0;
+        uint8_t internal_env_sweep_pace_counter;
 
 
         /**
@@ -66,12 +71,14 @@ class Channel1 {
         uint8_t length_timer;
         bool length_timer_enable;
         uint8_t length_timer_counter;
+        int internal_m_cycle_counter_length_enable = 0;
 
 
         // This will determine pitch
         uint16_t period;
+        uint16_t period_div;
 
-        int internal_m_cycle_counter = 0;
+        int internal_m_cycle_counter_period_sweep = 0;
         int sweep_rate = 0;
 
         /**
@@ -85,9 +92,10 @@ class Channel1 {
         uint8_t individual_step;
         static constexpr uint8_t DUTY_TABLES[4][8] = {
             {0,0,0,0,0,0,0,1}, // 12.5%
-            {1,0,0,0,0,0,0,1}, // 25%
-            {1,0,0,0,0,1,1,1}, // 50%
-            {0,1,1,1,1,1,1,0}  // 75%
+            {0,0,0,0,0,0,1,1}, // 25%
+            {0,0,0,0,1,1,1,1}, // 50%
+            {1,1,1,1,1,1,0,0}  // 75%
         };
+        uint8_t duty_step; // used to index the du
 
 };

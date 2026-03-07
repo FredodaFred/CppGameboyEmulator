@@ -4,7 +4,7 @@
 // https://gbdev.io/pandocs/Timer_and_Divider_Registers.html#timer-and-divider-registers
 class Timer {
     public:
-        void write_timer(uint16_t addr, uint8_t data);
+    bool write_timer(uint16_t addr, uint8_t data);
         uint8_t read_timer(uint16_t addr);
 
         bool tick(int clock_cycles);

@@ -4,17 +4,23 @@
 
 
 void Channel1::tick() {
-    internal_m_cycle_counter++;
-
-    period_tick();
+    period_sweep_tick();
+    length_timer_tick();
+    volume_envelope_tick();
+    period_div++; // period dividers are clocked at 1048576 Hz (1 M Cycle)
+    if (period_div >= 2048) {
+        // when it overflows (being clocked when it’s already 2047, or $7FF), its value is set from the contents of NR13 and NR14.
+        period_div = period;
+        duty_step = (duty_step + 1) & 0x7;
+    }
 }
 
 
 int16_t Channel1::sample() {
     if (!DAC || !enabled) return 0x0;
-    bool is_high = DUTY_TABLES[wave_duty][individual_step];
-    uint8_t sound = is_high ? initial_volume : 0x0;
-    return static_cast<int16_t>(sound * 500);
+    bool is_high = DUTY_TABLES[wave_duty][duty_step];
+    int16_t volume_output = is_high ? static_cast<int16_t>(current_volume) : -static_cast<int16_t>(current_volume);
+    return volume_output * 500;
 }
 
 
@@ -51,14 +57,15 @@ uint8_t Channel1::read_nr11() {
 void Channel1::write_nr12(uint8_t data) {
     initial_volume = (data >> 4);
     current_volume = initial_volume;
-    env_dir =  (data & 0x08) != 0;
-    sweep_pace = data & 0x07;
+    env_dir =  ((data & 0x08) == 0 ) ? -1 : 1; // The envelope’s direction; 0 = decrease volume over time, 1 = increase volume over time.
+    env_sweep_pace = data & 0x07;
+    internal_env_sweep_pace_counter = env_sweep_pace;
     DAC = (data & 0xF8) != 0;
     if (!DAC) enabled = false;
 }
 
 uint8_t Channel1::read_nr12() {
-    return (individual_step << 4) | (static_cast<uint8_t>(env_dir) << 3) | sweep_pace;
+    return (individual_step << 4) | (static_cast<uint8_t>(env_dir) << 3) | env_sweep_pace;
 }
 
 void Channel1::write_nr13(uint8_t data) {
@@ -92,35 +99,61 @@ uint8_t Channel1::read_nr14() {
 void Channel1::trigger() {
     enabled = true;
     length_timer = initial_length_timer;
-    // period divider
+    period_div = period;
     current_volume = initial_volume;
-    internal_m_cycle_counter = 0;
+    internal_m_cycle_counter_period_sweep = 0;
 }
 
 void Channel1::length_timer_tick() {
     if (length_timer_enable) {
-        if ((internal_m_cycle_counter % LENGTH_TIMER_M_CYCLES_TICK_RATE ) == 0) {
+        internal_m_cycle_counter_length_enable++;
+        if ((internal_m_cycle_counter_length_enable == LENGTH_TIMER_M_CYCLES_TICK_RATE ) == 0) {
             length_timer++;
         }
 
         if (length_timer >= LENGTH_TIMER_M_CYCLES_TICK_RATE) {
             enabled = false;
         }
+    } else {
+        internal_m_cycle_counter_length_enable = 0;
     }
 }
 
-void Channel1::period_tick() {
-    if (pace != 0) {
-        int sweep_rate = 1049576/ (128 * pace);
-        if (internal_m_cycle_counter >= sweep_rate) {
-            // remember 1 << x is the same as 2 to the power of x
-            uint16_t period1 = period + direction*(period / (1 << individual_step));
-            if ((direction == 1) && period1 > 0x07FF) {
-                //handle overflow for addition.
-                enabled = false;
-            } else {
-                period = period1;
+/**
+ * Handles period sweep and period
+ */
+void Channel1::period_sweep_tick() {
+    internal_m_cycle_counter_period_sweep++;
+    int sweep_rate = 1048576/ (128 * pace);
+    if (internal_m_cycle_counter_period_sweep >= sweep_rate) {
+        internal_m_cycle_counter_period_sweep -= sweep_rate;
+        if (pace == 0) return;
+        // remember the bit shift represents dividing by a power of 2
+        uint16_t period1 = period + direction*(period_div >> individual_step);
+        if ((direction == 1) && period1 > 0x07FF) {
+            //handle overflow for addition.
+            enabled = false;
+        } else {
+            period = period1;
+        }
+    }
+}
+
+void Channel1::volume_envelope_tick() {
+    internal_m_cycle_counter_env++;
+    if (internal_m_cycle_counter_env >= ENV_RATE_M_CYCLES) {
+        internal_m_cycle_counter_env -= ENV_RATE_M_CYCLES;
+        if (env_sweep_pace == 0) return;
+        internal_env_sweep_pace_counter--;
+        if (internal_env_sweep_pace_counter == 0) {
+            // 4 bits store volume. Volume can be 0 to 15. These are the bounds checks
+            if (!((current_volume + env_dir) > 15 && env_dir == 1)) {
+                current_volume += env_dir;
+            } else if (!((current_volume + env_dir) < 0 && env_dir == -1)) {
+                current_volume += env_dir;
             }
+
+            internal_env_sweep_pace_counter = env_sweep_pace;
         }
     }
 }

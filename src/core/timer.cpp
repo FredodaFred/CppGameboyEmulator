@@ -69,10 +69,15 @@ bool Timer::tick_div(int clock_cycles) {
     return false;
 }
 
-void Timer::write_timer(uint16_t addr, uint8_t data) {
+/**
+ * We also need to handle the apu-div falling edge case here
+ */
+bool Timer::write_timer(uint16_t addr, uint8_t data) {
     if (addr == 0xFF04) {
+        bool apu_div_tick = DIV & 0b00010000;
         DIV = 0x00;
         div_remainder = 0x00;
+        if (apu_div_tick) return true;
     } else if (addr == 0xFF05) {
         TIMA = data;
         tima_remainder = 0x00;
@@ -81,6 +86,7 @@ void Timer::write_timer(uint16_t addr, uint8_t data) {
     } else if (addr == 0xFF07) {
         TAC = data & 0x0F;
     }
+    return false;
 }
 
 uint8_t Timer::read_timer(uint16_t addr) {

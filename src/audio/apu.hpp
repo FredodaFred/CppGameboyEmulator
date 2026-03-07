@@ -12,10 +12,11 @@ class APU {
         void init();
         void tick(int cycle, bool apu_div_tick);
 
-        // 87 M Cycles = 4,194,304 Hz / Cycles ÷ 48,000 HZ (sample rate we desire)
-        static constexpr float SAMPLE_RATE = 87.38;
+        // 21.8453 M Cycles = 1048576.0 Hz / M Cycles ÷ 48,000 HZ (sample rate we desire)
+        static constexpr float SAMPLE_RATE = 21.8453;
         static constexpr int MAX_CHANNEL_VOL_FACTOR = 500;
 
+        uint8_t apu_div{0};
     private:
         Speaker& speaker;
         void tick_cycle();
@@ -23,7 +24,7 @@ class APU {
         void mix_and_sample();
 
         float sample_accumulator{0};
-        uint8_t apu_div{0};
+
 
         uint8_t WAVE_RAM[16]; // 16 byte ram
 

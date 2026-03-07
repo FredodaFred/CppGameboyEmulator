@@ -38,10 +38,11 @@ void APU::tick(int cycle, bool apu_div_tick) {
     for (int i = 0; i < cycle; i++) {
         tick_cycle();
     }
+
+    if (apu_div == 8) apu_div = 0;
 }
 
 void APU::tick_cycle() {
-
     // collect samples
      sample_accumulator += 1.0;
     if (sample_accumulator >= SAMPLE_RATE) {
@@ -58,6 +59,18 @@ void APU::mix_and_sample() {
     // Check NR51 for left and right enables
     if (nr51 & 0x10) left_stereo += ch1_sample; // Bit 4: Ch1 Left
     if (nr51 & 0x01) right_stereo += ch1_sample; // Bit 0: Ch1 Right
+
+
+    // Handle apu_div events
+    if (apu_div == 2) {
+        // sound length
+    } else if (apu_div == 4) {
+        //ch1 freq sweep
+    } else if (apu_div == 8) {
+        // envelope sweep
+    }
+
+
     speaker.play_sample(left_stereo, right_stereo);
 
 }
