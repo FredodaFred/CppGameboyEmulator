@@ -39,10 +39,11 @@ void APU::tick(int cycle, bool apu_div_tick) {
         tick_cycle();
     }
 
-    if (apu_div == 8) apu_div = 0;
+    if (apu_div == 7) apu_div = 0;
 }
 
 void APU::tick_cycle() {
+    channel1.tick();
     // collect samples
      sample_accumulator += 1.0;
     if (sample_accumulator >= SAMPLE_RATE) {
@@ -51,9 +52,28 @@ void APU::tick_cycle() {
     }
 }
 
+
+
 void APU::mix_and_sample() {
     int16_t left_stereo = 0;
     int16_t right_stereo = 0;
+
+    // Handle apu_div events
+    if (apu_div % 2 == 0) {
+        channel1.length_timer_tick();
+    }
+
+    // Sweep (128 Hz) - steps 2 and 6
+    if (apu_div == 2 || apu_div == 6) {
+        channel1.period_sweep_tick();
+    }
+
+    // Envelope (64 Hz) - step 7
+    if (apu_div == 7) {
+        channel1.volume_envelope_tick();
+        apu_div = 0;  // Reset after step 7
+    }
+
     int16_t ch1_sample = channel1.sample();
 
     // Check NR51 for left and right enables
@@ -61,18 +81,7 @@ void APU::mix_and_sample() {
     if (nr51 & 0x01) right_stereo += ch1_sample; // Bit 0: Ch1 Right
 
 
-    // Handle apu_div events
-    if (apu_div == 2) {
-        // sound length
-    } else if (apu_div == 4) {
-        //ch1 freq sweep
-    } else if (apu_div == 8) {
-        // envelope sweep
-    }
-
-
     speaker.play_sample(left_stereo, right_stereo);
-
 }
 
 uint8_t APU::apu_io_read(uint16_t addr) {
@@ -110,6 +119,7 @@ uint8_t APU::apu_io_read(uint16_t addr) {
         return WAVE_RAM[addr - 0xFF30];
     }
 }
+
 void APU::apu_io_write(uint16_t addr, uint8_t data) {
     switch (addr) {
 

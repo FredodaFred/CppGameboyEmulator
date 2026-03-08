@@ -4,8 +4,10 @@
 #include "../core/timer.hpp"
 #include "../graphics/ppu.hpp"
 #include "../graphics/screen.hpp"
+#include <chrono>
+#include <thread>
 
-#define M_CYCLES_PER_FRAME 10
+#define M_CYCLES_PER_FRAME 2
 
 
 class Emulator {

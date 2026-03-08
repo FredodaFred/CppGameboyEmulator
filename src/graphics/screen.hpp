@@ -13,7 +13,6 @@ class Screen {
         GLFWwindow* init();
         void close();
         void render(const uint8_t *frame_buffer, int size);
-        void tick();
         GLFWwindow* window;
     private:
 
@@ -21,12 +20,6 @@ class Screen {
         GLuint pbo_id{0};     // The handle for the Pixel Buffer Object
         GLuint vao;           // the handle for VAO
         GLuint shader_program;  // shader for openGL (we don't actually use this, the library forces us to make it)
-
-        struct RGB {
-            uint8_t r;
-            uint8_t g;
-            uint8_t b;
-        };
 
         static constexpr uint8_t rgb_palette[4][3] = {{255, 255, 255}, {211, 211, 211}, {169, 169, 169}, {0, 0, 0}};
         static constexpr int windowWidth = 160;

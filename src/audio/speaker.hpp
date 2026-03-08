@@ -4,6 +4,7 @@
 #include <SDL2/SDL.h>
 #include <iostream>
 #include <ostream>
+#include <thread>
 
 #define UNPAUSE_AUDIO 0
 #define PAUSE_AUDIO 1
@@ -22,4 +23,5 @@ class Speaker {
         void close();
     private:
         SDL_AudioDeviceID device_id;
+        std::vector<int16_t> audio_bucket;
 };

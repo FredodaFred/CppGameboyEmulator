@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <SDL2/SDL_audio.h>
 #include "channel1.hpp"
+#include "channel2.hpp"
 #include "speaker.hpp"
 
 class APU {
@@ -13,7 +14,7 @@ class APU {
         void tick(int cycle, bool apu_div_tick);
 
         // 21.8453 M Cycles = 1048576.0 Hz / M Cycles ÷ 48,000 HZ (sample rate we desire)
-        static constexpr float SAMPLE_RATE = 21.8453;
+        static constexpr float SAMPLE_RATE = 1048576.0f / 48000.0f;
         static constexpr int MAX_CHANNEL_VOL_FACTOR = 500;
 
         uint8_t apu_div{0};
@@ -29,6 +30,7 @@ class APU {
         uint8_t WAVE_RAM[16]; // 16 byte ram
 
         Channel1 channel1;
+        Channel2 channel2;
 
        // channel 2
         uint8_t nr21{0x3F};

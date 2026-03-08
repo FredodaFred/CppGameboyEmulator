@@ -6,12 +6,7 @@ Emulator::Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen, A
 
 void Emulator::run() {
     while (!glfwWindowShouldClose(screen.window)) {
-        int cycles_this_frame = 0;
-        while (cycles_this_frame < M_CYCLES_PER_FRAME) {
-            this->tick();
-            cycles_this_frame++;
-        }
-        screen.tick();
+        tick();
     }
 }
 
@@ -22,7 +17,6 @@ void Emulator::tick() {
     bool apu_div_tick = timer.tick(m_cycles);
     ppu.tick(m_cycles);
     apu.tick(m_cycles, apu_div_tick);
-
     handle_isr();
 }
 

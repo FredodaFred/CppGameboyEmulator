@@ -1,10 +1,5 @@
 #include "screen.hpp"
-
 #include "joypad/joypad.hpp"
-
-void Screen::tick() {
-    glfwPollEvents();
-}
 
 /**
  *  left -> right in an uint16_t. this draws 8 pixels to screen, each 2 bit value being a color
@@ -44,6 +39,7 @@ void Screen::render(const uint8_t* frame_buffer, const int size) {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glfwSwapBuffers(window);
+
     glfwPollEvents();
 }
 

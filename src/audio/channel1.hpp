@@ -92,10 +92,10 @@ class Channel1 {
         uint8_t individual_step;
         static constexpr uint8_t DUTY_TABLES[4][8] = {
             {0,0,0,0,0,0,0,1}, // 12.5%
-            {0,0,0,0,0,0,1,1}, // 25%
-            {0,0,0,0,1,1,1,1}, // 50%
-            {1,1,1,1,1,1,0,0}  // 75%
+            {1,0,0,0,0,0,0,1}, // 25%
+            {1,0,0,0,0,1,1,1}, // 50%
+            {0,1,1,1,1,1,1,0}  // 75%
         };
-        uint8_t duty_step; // used to index the du
+        uint8_t duty_step = 0; // used to index the du
 
 };
