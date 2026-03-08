@@ -30,10 +30,8 @@ add_library(Core STATIC
     audio/apu.hpp
     audio/speaker.cpp
     audio/speaker.hpp
-    audio/channel1.cpp
-    audio/channel1.hpp
-    audio/channel2.cpp
-    audio/channel2.hpp
+        audio/square_channel.cpp
+        audio/square_channel.hpp
 )
 
 target_include_directories(Core PUBLIC

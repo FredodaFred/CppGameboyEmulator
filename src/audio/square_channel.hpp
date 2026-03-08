@@ -6,29 +6,29 @@
 #define LENGTH_TIMER_M_CYCLES_TICK_RATE 4096
 #define ENV_RATE_M_CYCLES 16384
 
-class Channel1 {
+class SquareChannel {
 
     public:
-        Channel1() = default;
+        SquareChannel() = default;
 
         void tick();
 
         int16_t sample();
 
-        void write_nr10(uint8_t data);
-        uint8_t read_nr10();
+        void write_nrx0(uint8_t data);
+        uint8_t read_nrx0();
 
-        void write_nr11(uint8_t data);
-        uint8_t read_nr11();
+        void write_nrx1(uint8_t data);
+        uint8_t read_nrx1();
 
-        void write_nr12(uint8_t data);
-        uint8_t read_nr12();
+        void write_nrx2(uint8_t data);
+        uint8_t read_nrx2();
 
-        void write_nr13(uint8_t data);
-        uint8_t read_nr13();
+        void write_nrx3(uint8_t data);
+        uint8_t read_nrx3();
 
-        void write_nr14(uint8_t data);
-        uint8_t read_nr14();
+        void write_nrx4(uint8_t data);
+        uint8_t read_nrx4();
 
         void trigger();
 

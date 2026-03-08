@@ -1,8 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <SDL2/SDL_audio.h>
-#include "channel1.hpp"
-#include "channel2.hpp"
+#include "square_channel.hpp"
 #include "speaker.hpp"
 
 class APU {
@@ -29,8 +28,8 @@ class APU {
 
         uint8_t WAVE_RAM[16]; // 16 byte ram
 
-        Channel1 channel1;
-        Channel2 channel2;
+        SquareChannel channel1;
+        SquareChannel channel2;
 
        // channel 2
         uint8_t nr21{0x3F};

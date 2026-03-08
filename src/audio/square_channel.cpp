@@ -1,19 +1,19 @@
-#include "channel1.hpp"
+#include "square_channel.hpp"
 
 //https://gbdev.io/pandocs/Audio_Registers.html#ff10--nr10-channel-1-sweep
 
 
-void Channel1::tick() {
+void SquareChannel::tick() {
 
     period_div++; // period dividers are clocked at 1048576 Hz (1 M Cycle)
-    if (period_div >= (2048 - period) * 4) {
+    if (period_div >= (2048 - period)) {
         period_div = 0;
         duty_step = (duty_step + 1) & 0x7;
     }
 }
 
 
-int16_t Channel1::sample() {
+int16_t SquareChannel::sample() {
     if (!DAC || !enabled) return 0x0;
     bool is_high = DUTY_TABLES[wave_duty][duty_step];
     int16_t volume_output = is_high ? static_cast<int16_t>(current_volume) : -static_cast<int16_t>(current_volume);
@@ -21,23 +21,23 @@ int16_t Channel1::sample() {
 }
 
 
-void Channel1::write_nr10(uint8_t data) {
+void SquareChannel::write_nrx0(uint8_t data) {
     pace = (data >> 4) & 0x07;
     direction = ((data & 0x10) != 0) ? -1 : 1; // Direction: 0 = Addition (period increases); 1 = Subtraction (period decreases)
     individual_step = data & 0x07;
 }
 
-uint8_t Channel1::read_nr10() {
+uint8_t SquareChannel::read_nrx0() {
     return ((pace << 4) | (individual_step << 3) | individual_step);
 }
 
-void Channel1::write_nr11(uint8_t data) {
+void SquareChannel::write_nrx1(uint8_t data) {
     initial_length_timer = data & 0b00111111;
     length_timer = initial_length_timer;
     wave_duty = data >> 6;
 }
 
-uint8_t Channel1::read_nr11() {
+uint8_t SquareChannel::read_nrx1() {
     uint8_t wave_duty_binary;
     if (wave_duty == 0) {
          wave_duty_binary = 0;
@@ -51,7 +51,7 @@ uint8_t Channel1::read_nr11() {
     return wave_duty_binary | individual_step;
 }
 
-void Channel1::write_nr12(uint8_t data) {
+void SquareChannel::write_nrx2(uint8_t data) {
     initial_volume = (data >> 4);
     current_volume = initial_volume;
     env_dir =  ((data & 0x08) == 0 ) ? -1 : 1; // The envelope’s direction; 0 = decrease volume over time, 1 = increase volume over time.
@@ -61,26 +61,26 @@ void Channel1::write_nr12(uint8_t data) {
     if (!DAC) enabled = false;
 }
 
-uint8_t Channel1::read_nr12() {
+uint8_t SquareChannel::read_nrx2() {
     return (individual_step << 4) | (static_cast<uint8_t>(env_dir) << 3) | env_sweep_pace;
 }
 
-void Channel1::write_nr13(uint8_t data) {
+void SquareChannel::write_nrx3(uint8_t data) {
     period = (period & 0xFF00) | static_cast<uint16_t>(data);
 }
 
-uint8_t Channel1::read_nr13() {
+uint8_t SquareChannel::read_nrx3() {
     return static_cast<uint8_t>(period & 0x00FF);
 }
 
-void Channel1::write_nr14(uint8_t data) {
+void SquareChannel::write_nrx4(uint8_t data) {
     period = (period & 0x00FF) | (static_cast<uint16_t>(data & 0x07) << 8);
     length_timer_enable = data & 0b01000000;
     bool trigger = data & 0b10000000;
     if (trigger) this->trigger();
 }
 
-uint8_t Channel1::read_nr14() {
+uint8_t SquareChannel::read_nrx4() {
     return (static_cast<uint8_t>(env_dir) << 7) |
            (static_cast<uint8_t>(env_dir) << 6) |
             (static_cast<uint8_t>(period >> 8) & 0x07);
@@ -93,7 +93,7 @@ uint8_t Channel1::read_nr14() {
  * Envelope timer is reset.
  * Volume is set to contents of NR12 initial volume.
  */
-void Channel1::trigger() {
+void SquareChannel::trigger() {
     enabled = true;
     length_timer = initial_length_timer;
     period_div = period;
@@ -102,7 +102,7 @@ void Channel1::trigger() {
     internal_env_sweep_pace_counter = env_sweep_pace;
 }
 
-void Channel1::length_timer_tick() {
+void SquareChannel::length_timer_tick() {
     if (length_timer_enable) {
         internal_m_cycle_counter_length_enable++;
         if  (internal_m_cycle_counter_length_enable == LENGTH_TIMER_M_CYCLES_TICK_RATE ) {
@@ -119,7 +119,7 @@ void Channel1::length_timer_tick() {
 /**
  * Handles period sweep and period
  */
-void Channel1::period_sweep_tick() {
+void SquareChannel::period_sweep_tick() {
     internal_m_cycle_counter_period_sweep++;
     int sweep_rate = 1048576/ (128 * pace);
     if (internal_m_cycle_counter_period_sweep >= sweep_rate) {
@@ -136,7 +136,7 @@ void Channel1::period_sweep_tick() {
     }
 }
 
-void Channel1::volume_envelope_tick() {
+void SquareChannel::volume_envelope_tick() {
     internal_m_cycle_counter_env++;
     if (internal_m_cycle_counter_env >= ENV_RATE_M_CYCLES) {
         internal_m_cycle_counter_env -= ENV_RATE_M_CYCLES;
