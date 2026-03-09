@@ -53,12 +53,12 @@ class SquareChannel {
          */
         uint8_t pace;
         uint8_t pace_counter;
-        int direction;
+        bool direction;
 
         uint8_t initial_volume;
         uint8_t current_volume;
 
-        int env_dir;
+        bool env_dir;
         uint8_t env_sweep_pace;
         uint8_t internal_env_sweep_pace_counter;
 
