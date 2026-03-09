@@ -8,7 +8,7 @@ void Speaker::init() {
     want.freq = 48000;
     want.format = AUDIO_S16SYS;
     want.channels = 2;
-    want.samples = 128; // do NOT make this higher than 512 unless u want fried audio
+    want.samples = 512; // do NOT make this higher than 512 unless u want fried audio
     device_id = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
 
     if (device_id == 0) {

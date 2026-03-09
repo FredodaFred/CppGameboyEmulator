@@ -3,6 +3,7 @@
 #include <SDL2/SDL_audio.h>
 #include "square_channel.hpp"
 #include "speaker.hpp"
+#include "wave_channel.hpp"
 
 class APU {
     public:
@@ -25,11 +26,9 @@ class APU {
 
         float sample_accumulator{0};
 
-
-        uint8_t WAVE_RAM[16]; // 16 byte ram
-
         SquareChannel channel1;
         SquareChannel channel2;
+        WaveChannel channel3;
 
        // channel 2
         uint8_t nr21{0x3F};

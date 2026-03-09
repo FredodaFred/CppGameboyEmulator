@@ -15,14 +15,15 @@ void SquareChannel::tick() {
 
 int16_t SquareChannel::sample() {
     if (!DAC || !enabled) return 0x0;
-    bool is_high = DUTY_TABLES[wave_duty][duty_step];
+    bool is_high = SQUARE_WAVE_DUTY[wave_duty][duty_step];
     int16_t volume_output = is_high ? static_cast<int16_t>(current_volume) : -static_cast<int16_t>(current_volume);
-    return volume_output * 500;
+    return volume_output*600;
 }
 
 
 void SquareChannel::write_nrx0(uint8_t data) {
     pace = (data >> 4) & 0x07;
+    pace_counter = pace;
     direction = ((data & 0x10) != 0) ? -1 : 1; // Direction: 0 = Addition (period increases); 1 = Subtraction (period decreases)
     individual_step = data & 0x07;
 }
@@ -76,13 +77,13 @@ uint8_t SquareChannel::read_nrx3() {
 void SquareChannel::write_nrx4(uint8_t data) {
     period = (period & 0x00FF) | (static_cast<uint16_t>(data & 0x07) << 8);
     length_timer_enable = data & 0b01000000;
-    bool trigger = data & 0b10000000;
-    if (trigger) this->trigger();
+    trigger_val = data & 0b10000000;
+    if (trigger_val) this->trigger();
 }
 
 uint8_t SquareChannel::read_nrx4() {
-    return (static_cast<uint8_t>(env_dir) << 7) |
-           (static_cast<uint8_t>(env_dir) << 6) |
+    return (static_cast<uint8_t>(trigger_val) << 7) |
+           (static_cast<uint8_t>(length_timer_enable) << 6) |
             (static_cast<uint8_t>(period >> 8) & 0x07);
 }
 
@@ -95,21 +96,18 @@ uint8_t SquareChannel::read_nrx4() {
  */
 void SquareChannel::trigger() {
     enabled = true;
-    length_timer = initial_length_timer;
-    period_div = period;
+    if (length_timer >= LENGTH_TIMER_MAX) {
+        length_timer = initial_length_timer;
+    }
+    period_div = (2048 - period);
     current_volume = initial_volume;
-    internal_m_cycle_counter_period_sweep = 0;
     internal_env_sweep_pace_counter = env_sweep_pace;
+    pace_counter = pace;
 }
 
 void SquareChannel::length_timer_tick() {
     if (length_timer_enable) {
-        internal_m_cycle_counter_length_enable++;
-        if  (internal_m_cycle_counter_length_enable == LENGTH_TIMER_M_CYCLES_TICK_RATE ) {
-            internal_m_cycle_counter_length_enable = 0;
-            length_timer++;
-        }
-
+        length_timer++;
         if (length_timer >= LENGTH_TIMER_MAX) {
             enabled = false;
         }
@@ -118,40 +116,36 @@ void SquareChannel::length_timer_tick() {
 
 /**
  * Handles period sweep and period
+ * This function is called every 128 Hz
  */
 void SquareChannel::period_sweep_tick() {
-    internal_m_cycle_counter_period_sweep++;
-    int sweep_rate = 1048576/ (128 * pace);
-    if (internal_m_cycle_counter_period_sweep >= sweep_rate) {
-        internal_m_cycle_counter_period_sweep -= sweep_rate;
-        if (pace == 0) return;
-        // remember the bit shift represents dividing by a power of 2
-        uint16_t period1 = period + direction*(period >> individual_step);
-        if ((direction == 1) && period1 > 0x07FF) {
-            //handle overflow for addition.
+    if (pace == 0) return;
+    pace_counter--;
+    if (pace_counter == 0) {
+        pace_counter = (pace == 0) ? 8 : pace;
+        // direction is -1 or 1, the bit shift represents dividing period by a power of 2 indicated by step
+        uint16_t period0 = period + direction*(period >> individual_step);
+        if (period0 > 0x07FF) {
             enabled = false;
         } else {
-            period = period1;
+            period = period0;
         }
+        pace_counter = pace;
     }
 }
 
 void SquareChannel::volume_envelope_tick() {
-    internal_m_cycle_counter_env++;
-    if (internal_m_cycle_counter_env >= ENV_RATE_M_CYCLES) {
-        internal_m_cycle_counter_env -= ENV_RATE_M_CYCLES;
-        if (env_sweep_pace == 0) return;
-        internal_env_sweep_pace_counter--;
-        if (internal_env_sweep_pace_counter == 0) {
-            // 4 bits store volume. Volume can be 0 to 15. These are the bounds checks
-            if (!((current_volume + env_dir) > 15 && env_dir == 1)) {
-                current_volume++;
-            } else if (!((current_volume + env_dir) < 0 && env_dir == -1)) {
-                current_volume--;
-            }
-
-            internal_env_sweep_pace_counter = env_sweep_pace;
+    if (env_sweep_pace == 0) return;
+    internal_env_sweep_pace_counter--;
+    internal_env_sweep_pace_counter = env_sweep_pace;
+    if (internal_env_sweep_pace_counter == 0) {
+        // 4 bits store volume. Volume can be 0 to 15. These are the bounds checks
+        if (!((current_volume + env_dir) > 15 && env_dir == 1)) {
+            current_volume++;
+        } else if (!((current_volume + env_dir) < 0 && env_dir == -1)) {
+            current_volume--;
         }
+
     }
 }
 

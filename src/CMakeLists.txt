@@ -32,6 +32,8 @@ add_library(Core STATIC
     audio/speaker.hpp
         audio/square_channel.cpp
         audio/square_channel.hpp
+        audio/wave_channel.cpp
+        audio/wave_channel.hpp
 )
 
 target_include_directories(Core PUBLIC
