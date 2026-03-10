@@ -91,19 +91,14 @@ void PPU::draw_scanline() {
 
 void PPU::draw_sprites_onto_scanline() {
     if (!(LCDC & 0x02)) return; // OBJ disabled
+    bool sprite_drawn[160] = {};
 
-    int prev_x = -1;
-    bool prev_x_flip = false;
     for (const Sprite& sprite : sprite_buffer) {
         uint8_t y_pos  = sprite.y;
         uint8_t x_pos  = sprite.x;
         uint8_t tile_id   = sprite.tile_id;
         uint8_t attr_flags = sprite.attr;
         bool x_flip = (attr_flags & 0x20) != 0;
-
-        if ((sprite.x == prev_x) && (prev_x_flip == x_flip)) continue;
-        prev_x = sprite.x; //Object priority. previous x is written earlier in OAM, so at the same X coord, it gets priority over other Object
-        prev_x_flip = x_flip;
 
         // Y = Object’s vertical position on the screen + 16. So for exampl
         bool y_flip = (attr_flags & 0x40) != 0;
@@ -124,14 +119,16 @@ void PPU::draw_sprites_onto_scanline() {
             uint8_t b1 = (high >> bit_idx) & 1;
             uint8_t tile_pixel = (b1 << 1) | b0;
 
-            // Do not render transparent pixels
-            bool dmg_palette = (attr_flags & 0x10) != 0;
-            if (tile_pixel == 0) continue;
-
             int screen_x = x_flip ?  x_pos - 8 + (7 - i) : x_pos - 8 + i;
-
             // Verify sprite is not hidden
             if (screen_x < 0 || screen_x >= 160) continue;
+
+            // Do not render transparent pixels
+            bool dmg_palette = (attr_flags & 0x10) != 0;
+            if (tile_pixel == 0) {
+                sprite_drawn[screen_x] = true;
+                continue;
+            }
 
             // Priority: 0 = No, 1 = BG and Window color indices 1–3 are drawn over this OBJ
             bool bg_priority = attr_flags & 0x80;
@@ -140,6 +137,7 @@ void PPU::draw_sprites_onto_scanline() {
             if (tile_pixel == 0) continue;
             uint8_t color_value = dmg_palette ? map_color_id_to_color_palette(tile_pixel, OBP1) : map_color_id_to_color_palette(tile_pixel, OBP0);
             frame_buffer[(LY * 160) + screen_x] = color_value;
+            sprite_drawn[screen_x] = true;
         }
     }
 }
