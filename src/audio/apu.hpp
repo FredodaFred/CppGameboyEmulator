@@ -4,6 +4,7 @@
 #include "square_channel.hpp"
 #include "speaker.hpp"
 #include "wave_channel.hpp"
+#include "noise_channel.hpp"
 
 class APU {
     public:
@@ -29,6 +30,7 @@ class APU {
         SquareChannel channel1;
         SquareChannel channel2;
         WaveChannel channel3;
+        NoiseChannel channel4;
 
        // channel 2
         uint8_t nr21{0x3F};

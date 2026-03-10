@@ -2,7 +2,7 @@
 
 void WaveChannel::tick() {
     period_div++; // period dividers are clocked at 1048576 Hz (1 M Cycle)
-    if (period_div >= (2048 - period)/2) {
+    if (period_div >= (2048 - period)/2) { //
         period_div = 0;
         wave_index = (wave_index + 1) & 0x1F;  // & 0x1F = % 32
     }

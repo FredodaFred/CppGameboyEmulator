@@ -40,7 +40,7 @@ void SquareChannel::trigger() {
 
     period_div = 0;
     current_volume = initial_volume;
-    internal_env_sweep_pace_counter = env_sweep_pace;
+    internal_env_sweep_pace_counter = 0;
     pace_counter = (pace == 0) ? 8 : pace;
 }
 
@@ -125,7 +125,6 @@ void SquareChannel::write_nrx2(uint8_t data) {
     current_volume = initial_volume;
     env_dir = data & 0x08; // The envelope’s direction; 0 = decrease volume over time, 1 = increase volume over time.
     env_sweep_pace = data & 0x07;
-    internal_env_sweep_pace_counter = env_sweep_pace;
     DAC = (data & 0xF8) != 0;
     if (!DAC) enabled = false;
 }

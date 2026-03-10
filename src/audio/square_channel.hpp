@@ -3,7 +3,6 @@
 #include <stdexcept>
 
 #define LENGTH_TIMER_MAX 64
-#define LENGTH_TIMER_M_CYCLES_TICK_RATE 4096
 #define ENV_RATE_M_CYCLES 16384
 
 class SquareChannel {

@@ -34,6 +34,11 @@ void APU::init() {
     channel3.write_nr33(0xFF);
     channel3.write_nr34(0xBF);
 
+    channel4.write_nr41(0xFF);
+    channel4.write_nr42(0x00);
+    channel4.write_nr43(0x00);
+    channel4.write_nr44(0xBF);
+
     speaker.init();
 }
 
@@ -45,6 +50,7 @@ void APU::tick(int cycle, bool apu_div_tick) {
             channel1.length_timer_tick();
             channel2.length_timer_tick();
             channel3.length_timer_tick();
+            channel4.length_timer_tick();
         }
 
         // Sweep (128 Hz) every 4 ticks
@@ -76,6 +82,7 @@ void APU::tick_cycle() {
     channel1.tick();
     channel2.tick();
     channel3.tick();
+    channel4.tick();
 
     // collect samples
      sample_accumulator += 1.0;
@@ -90,14 +97,15 @@ void APU::mix_and_sample() {
     int16_t left_stereo = 0;
     int16_t right_stereo = 0;
 
-
     int16_t ch1_sample = channel1.sample();
     int16_t ch2_sample = channel2.sample();
     int16_t ch3_sample = channel3.sample();
+    int16_t ch4_sample = channel4.sample();
 
     uint8_t master_volume_right = nr50 & 0x07; // first 3 bits
-    bool vin_right = nr50 & 0x08; // value 4th bit
     uint8_t master_volume_left = ((nr50 & (0b01110000)) >> 4); //value of 6,5,4
+
+    bool vin_right = nr50 & 0x08; // value 4th bit
     bool vin_left = (nr50 & 0b10000000); //MSB
 
     // Check NR51 and NR50 for left and right enables
@@ -109,6 +117,9 @@ void APU::mix_and_sample() {
 
     if (nr51 & 0x40) left_stereo += ch3_sample; // Bit 5: Ch2 Left
     if (nr51 & 0x04) right_stereo += ch3_sample; // Bit 1: Ch2 Right
+
+    if (nr51 & 0x80) left_stereo += ch4_sample; // Bit 5: Ch2 Left
+    if (nr51 & 0x08) right_stereo += ch4_sample; // Bit 1: Ch2 Right
 
     // apply nr50
     // for 2 channels max is 1200, so each vale
@@ -137,10 +148,10 @@ uint8_t APU::apu_io_read(uint16_t addr) {
         case 0xFF1D: return channel3.read_nr33();
         case 0xFF1E: return channel3.read_nr34();
 
-        case 0xFF20: return nr41;
-        case 0xFF21: return nr42;
-        case 0xFF22: return nr43;
-        case 0xFF23: return nr44;
+            // nr_41 is write only
+        case 0xFF21: return channel4.read_nr42();
+        case 0xFF22: return channel4.read_nr43();
+        case 0xFF23: return channel4.read_nr42();
 
         case 0xFF24: return nr50;
         case 0xFF25: return nr51;
@@ -173,10 +184,10 @@ void APU::apu_io_write(uint16_t addr, uint8_t data) {
         case 0xFF1D: channel3.write_nr33(data); break;
         case 0xFF1E: channel3.write_nr34(data); break;
 
-        case 0xFF20: nr41 = data; break;
-        case 0xFF21: nr42 = data; break;
-        case 0xFF22: nr43 = data; break;
-        case 0xFF23: nr44 = data; break;
+        case 0xFF20: channel4.write_nr41(data); break;
+        case 0xFF21: channel4.write_nr42(data); break;
+        case 0xFF22: channel4.write_nr43(data); break;
+        case 0xFF23: channel4.write_nr44(data); break;
 
         case 0xFF26: nr52 = data; break;
         case 0xFF25: nr51 = data; break;
