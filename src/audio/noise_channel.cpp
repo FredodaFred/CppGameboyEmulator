@@ -2,8 +2,8 @@
 
 void NoiseChannel::tick() {
     // this is clocked 1/4 an M cycle
-    int tick_rate = clock_shift == 0 ? 4 * (clock_div << clock_shift) :  4 * (clock_div >> 1);
-    if (tick_rate == 0) tick_rate = 1;
+    int tick_rate = (clock_div == 0 ? 8 : clock_div * 16) << clock_shift;
+
     div++;
     if (div >= tick_rate) {
         div = 0;
@@ -31,7 +31,7 @@ void NoiseChannel::trigger() {
     enabled = true;
     internal_env_sweep_pace_counter = 0;
     current_volume = initial_volume;
-    lsfr = 0;
+    lsfr = 0x0;
 }
 
 void NoiseChannel::update_lsfr() {
@@ -65,14 +65,27 @@ void NoiseChannel::length_timer_tick() {
     }
 }
 
+void NoiseChannel::env_sweep_tick() {
+    if (env_sweep_pace == 0) return;
+
+    internal_env_sweep_pace_counter++;
+    if (internal_env_sweep_pace_counter >= env_sweep_pace) {
+        internal_env_sweep_pace_counter = 0;
+        if (env_dir) {
+            if (current_volume < 15) current_volume++;
+        } else {
+            if (current_volume > 0) current_volume--;
+        }
+    }
+}
+
 void NoiseChannel::write_nr41(uint8_t data) {
     initial_length_timer = data & 0b00111111;
 }
 
 void NoiseChannel::write_nr42(uint8_t data) {
     initial_volume = (data >> 4);
-    current_volume = initial_volume;
-    env_dir = data & 0x08; // The envelope’s direction; 0 = decrease volume over time, 1 = increase volume over time.
+    env_dir = (data >> 3) & 0x01; // The envelope’s direction; 0 = decrease volume over time, 1 = increase volume over time.
     env_sweep_pace = data & 0x07;
     internal_env_sweep_pace_counter = env_sweep_pace;
     DAC = (data & 0xF8) != 0;
@@ -94,10 +107,16 @@ uint8_t NoiseChannel::read_nr43() {
 }
 
 void NoiseChannel::write_nr44(uint8_t data) {
-    trigger_val = data & 0b10000000;
     length_timer_enable = data & 0b01000000;
+    if (length_timer_enable && length_timer >= LENGTH_TIMER_MAX) {
+        enabled = false;
+    }
+    trigger_val = data & 0b10000000;
+    if (trigger_val) {
+        trigger();
+    }
 }
 
 uint8_t NoiseChannel::read_nr44() {
-    return (trigger_val << 7) | (length_timer_enable << 6);
+    return trigger_val | length_timer_enable;
 }

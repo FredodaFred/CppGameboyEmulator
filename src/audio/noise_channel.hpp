@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <cstdio>
 
 #define LENGTH_TIMER_MAX 64
 
@@ -21,6 +22,8 @@ class NoiseChannel {
         int16_t sample();
         void length_timer_tick();
 
+        void env_sweep_tick();
+
     private:
         uint8_t initial_length_timer;
         uint8_t clock_shift;
@@ -32,8 +35,8 @@ class NoiseChannel {
         uint16_t period;
         uint16_t period_div;
 
-        bool DAC;
-        bool enabled;
+        bool DAC{true};
+        bool enabled{true};
 
         uint8_t length_timer;
         uint8_t initial_volume;

@@ -62,6 +62,7 @@ void APU::tick(int cycle, bool apu_div_tick) {
         if (apu_div == 7) {
             channel1.volume_envelope_tick();
             channel2.volume_envelope_tick();
+            channel4.env_sweep_tick();
             apu_div = 0;
         }
     }
@@ -115,11 +116,11 @@ void APU::mix_and_sample() {
     if (nr51 & 0x20) left_stereo += ch2_sample; // Bit 5: Ch2 Left
     if (nr51 & 0x02) right_stereo += ch2_sample; // Bit 1: Ch2 Right
 
-    if (nr51 & 0x40) left_stereo += ch3_sample; // Bit 5: Ch2 Left
-    if (nr51 & 0x04) right_stereo += ch3_sample; // Bit 1: Ch2 Right
+    if (nr51 & 0x40) left_stereo += ch3_sample; // Bit 6: Ch3 Left
+    if (nr51 & 0x04) right_stereo += ch3_sample; // Bit 2: Ch3 Right
 
-    if (nr51 & 0x80) left_stereo += ch4_sample; // Bit 5: Ch2 Left
-    if (nr51 & 0x08) right_stereo += ch4_sample; // Bit 1: Ch2 Right
+    if (nr51 & 0x80) left_stereo += ch4_sample; // Bit 7: Ch4 Left
+    if (nr51 & 0x08) right_stereo += ch4_sample; // Bit 3: Ch4 Right
 
     // apply nr50
     // for 2 channels max is 1200, so each vale
@@ -159,7 +160,7 @@ uint8_t APU::apu_io_read(uint16_t addr) {
         default:
     }
 
-    if (addr  >= 0xFF30 && addr <= 0xFF3F) {
+    if (addr >= 0xFF30 && addr <= 0xFF3F) {
         return channel3.read_WRAM(addr);
     }
 }
