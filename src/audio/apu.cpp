@@ -190,7 +190,7 @@ void APU::apu_io_write(uint16_t addr, uint8_t data) {
 
         case 0xFF24: nr50 = data; break;
         case 0xFF25: nr51 = data; break;
-        case 0xFF26: nr52 = data; break;
+        case 0xFF26: nr52 = (data & 0xF0) | (nr52 & 0x0F); break; //lower nibble is READ ONLY
 
         default:
     }
