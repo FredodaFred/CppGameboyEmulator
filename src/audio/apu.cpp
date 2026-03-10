@@ -131,7 +131,6 @@ void APU::mix_and_sample() {
 
 uint8_t APU::apu_io_read(uint16_t addr) {
     switch (addr) {
-
         case 0xFF10: return channel1.read_nrx0();
         case 0xFF11: return channel1.read_nrx1();
         case 0xFF12: return channel1.read_nrx2();
@@ -148,11 +147,10 @@ uint8_t APU::apu_io_read(uint16_t addr) {
         case 0xFF1C: return channel3.read_nr32();
         case 0xFF1D: return channel3.read_nr33();
         case 0xFF1E: return channel3.read_nr34();
-
             // nr_41 is write only
         case 0xFF21: return channel4.read_nr42();
         case 0xFF22: return channel4.read_nr43();
-        case 0xFF23: return channel4.read_nr42();
+        case 0xFF23: return channel4.read_nr44();
 
         case 0xFF24: return nr50;
         case 0xFF25: return nr51;
@@ -190,9 +188,10 @@ void APU::apu_io_write(uint16_t addr, uint8_t data) {
         case 0xFF22: channel4.write_nr43(data); break;
         case 0xFF23: channel4.write_nr44(data); break;
 
-        case 0xFF26: nr52 = data; break;
-        case 0xFF25: nr51 = data; break;
         case 0xFF24: nr50 = data; break;
+        case 0xFF25: nr51 = data; break;
+        case 0xFF26: nr52 = data; break;
+
         default:
     }
 

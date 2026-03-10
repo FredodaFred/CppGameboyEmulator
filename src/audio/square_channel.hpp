@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <stdexcept>
+#include <iostream>
 
 #define LENGTH_TIMER_MAX 64
 #define ENV_RATE_M_CYCLES 16384
@@ -74,6 +75,7 @@ class SquareChannel {
 
         // This will determine pitch
         uint16_t period;
+        uint16_t period_shadow= 0;
         uint16_t period_div;
         int sweep_rate = 0;
 

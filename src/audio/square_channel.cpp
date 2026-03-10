@@ -40,8 +40,9 @@ void SquareChannel::trigger() {
 
     period_div = 0;
     current_volume = initial_volume;
-    internal_env_sweep_pace_counter = 0;
+    internal_env_sweep_pace_counter = env_sweep_pace;
     pace_counter = (pace == 0) ? 8 : pace;
+    period_shadow = period;
 }
 
 void SquareChannel::length_timer_tick() {
@@ -58,20 +59,25 @@ void SquareChannel::length_timer_tick() {
  * This function is called every 128 Hz
  */
 void SquareChannel::period_sweep_tick() {
-    if (pace == 0) return;
-    pace_counter--;
-    if (pace_counter == 0) {
-        // direction is -1 or 1, the bit shift represents dividing period by a power of 2 indicated by step
-        if (individual_step > 0) {
-            uint16_t period0 = !direction ? (period + direction*(period >> individual_step)) : (period - direction*(period >> individual_step));
+    if (pace_counter > 0) pace_counter--;
+    if (pace_counter != 0) return;
 
-            if (!direction && period0 > 0x07FF) {
-                enabled = false;
-            } else {
-                period = period0;
-            }
-        }
-        pace_counter = pace;
+    pace_counter = (pace == 0) ? 8 : pace;
+    if (pace == 0) return;
+
+    // direction is -1 or 1, the bit shift represents dividing period by a power of 2 indicated by step
+    uint16_t period0 = direction ?
+        period_shadow - (period_shadow >> individual_step) :
+        period_shadow + (period_shadow >> individual_step);
+
+    if (period0 > 0x07FF) {
+        enabled = false;
+        return;
+    }
+
+    if (individual_step != 0) {
+        period = period0;
+        period_shadow = period0;
     }
 }
 
@@ -80,9 +86,9 @@ void SquareChannel::volume_envelope_tick() {
 
     internal_env_sweep_pace_counter--;
     if (internal_env_sweep_pace_counter <= 0) {
-        if (!env_dir  && current_volume < 15) {
+        if (env_dir && current_volume < 15) {
             current_volume++;
-        } else if (env_dir && current_volume > 0) {
+        } else if (!env_dir && current_volume > 0) {
             current_volume--;
         }
         internal_env_sweep_pace_counter = env_sweep_pace;
@@ -92,7 +98,7 @@ void SquareChannel::volume_envelope_tick() {
 void SquareChannel::write_nrx0(uint8_t data) {
     pace = (data >> 4) & 0x07;
     pace_counter = pace;
-    direction = data & 0x10; // Direction: 0 = Addition (period increases); 1 = Subtraction (period decreases)
+    direction = (data >> 3) & 0x01; // Direction: 0 = Addition (period increases); 1 = Subtraction (period decreases)
     individual_step = data & 0x07;
 }
 
@@ -122,8 +128,7 @@ uint8_t SquareChannel::read_nrx1() {
 
 void SquareChannel::write_nrx2(uint8_t data) {
     initial_volume = (data >> 4);
-    current_volume = initial_volume;
-    env_dir = data & 0x08; // The envelope’s direction; 0 = decrease volume over time, 1 = increase volume over time.
+    env_dir = (data >> 3) & 0x01; // The envelope’s direction; 0 = decrease volume over time, 1 = increase volume over time.
     env_sweep_pace = data & 0x07;
     DAC = (data & 0xF8) != 0;
     if (!DAC) enabled = false;
@@ -143,8 +148,8 @@ uint8_t SquareChannel::read_nrx3() {
 
 void SquareChannel::write_nrx4(uint8_t data) {
     period = (period & 0x00FF) | (static_cast<uint16_t>(data & 0x07) << 8);
-    length_timer_enable = data & 0b01000000;
-    trigger_val = data & 0b10000000;
+    length_timer_enable = (data >> 6) & 0x01;
+    trigger_val = (data >> 7) & 0x01;
     if (trigger_val) this->trigger();
 }
 

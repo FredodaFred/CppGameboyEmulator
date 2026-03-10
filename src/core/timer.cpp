@@ -4,7 +4,7 @@
 
 
 bool Timer::tick(int clock_cycles) {
-    bool apu_div_tick = tick_div(clock_cycles + div_remainder);
+    bool apu_div_tick = tick_div(clock_cycles);
     if (TAC & 0x04) {
         tick_tima(clock_cycles + tima_remainder);
     }
