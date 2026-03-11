@@ -8,8 +8,6 @@
 #include <iostream>
 #include <format>
 
-#define SAVE_FOLDER "./saves/"
-
 class Cart {
     public:
         bool cart_loaded = false;
@@ -17,7 +15,6 @@ class Cart {
         void write(uint16_t addr, uint8_t data);
         uint8_t read(uint16_t addr);
         void create_save_file();
-
         void load_ram();
 
         // Cartridge Header metadata
@@ -34,6 +31,7 @@ class Cart {
         std::vector<uint8_t> ram;
         bool save_ram{false};
         std::string file_name;
+        std::string file_path;
         int bank_mode = 0;
         uint8_t rom_bank_reg = 0x00;
         uint8_t ram_bank_reg = 0x00;
