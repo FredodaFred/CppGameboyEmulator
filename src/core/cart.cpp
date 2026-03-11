@@ -13,6 +13,9 @@ void Cart::loadFromFile(const string& path) {
         throw std::runtime_error("File not found");
     }
 
+    file_name = path.substr(path.find_last_of('/') + 1);
+    file_name = file_name.substr(0, file_name.find_last_of('.'));
+
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
 
@@ -22,6 +25,24 @@ void Cart::loadFromFile(const string& path) {
 
     parse(buffer);
     file.close();
+}
+
+void Cart::create_save_file() {
+    if (!save_ram) return;
+    std::filesystem::create_directories(SAVE_FOLDER);
+    string save_path = SAVE_FOLDER + file_name + ".sav";
+    std::ofstream file(save_path, std::ios::binary);
+    if (file.is_open()) {
+        file.write(reinterpret_cast<const char*>(ram.data()), ram.size());
+    }
+}
+
+void Cart::load_ram() {
+    string save_path = SAVE_FOLDER + file_name + ".sav";
+    ifstream file(save_path, std::ios::binary);
+    if (file.is_open()) {
+        file.read(reinterpret_cast<char*>(ram.data()), ram.size());
+    }
 }
 
 
@@ -65,6 +86,22 @@ void Cart::parse(const vector<uint8_t>& data) {
         case 0x08: max_banks = 512; break; // 8 MB
     }
 
+    // All battery rams use save files
+    if (
+        cart_type == 0x03 ||
+        cart_type == 0x06 ||
+        cart_type == 0x09 ||
+        cart_type == 0x0D ||
+        cart_type == 0x0F ||
+        cart_type == 0x13 ||
+        cart_type == 0x1B ||
+        cart_type == 0x1E ||
+        cart_type == 0x22 ||
+        cart_type == 0xFF
+    ) {
+        save_ram = true;
+        load_ram();
+    }
     cart_loaded = true;
 }
 
@@ -102,6 +139,23 @@ void Cart::write_MBC(uint8_t mbc_mode, uint16_t addr, uint8_t data) {
                     ram[banked_addr] = data;
                 }
             }
+            break;
+        case 0x05: // MBC 2
+        case 0x06:
+            if (addr <= 0x3FFF) {
+                // check LSB of upper byte
+                if ( (addr >> 8) & 0x0001)  {
+                    rom_bank_reg = (addr >> 8) & 0x0F;
+                    if (rom_bank_reg == 0x00) rom_bank_reg = 1;
+                } else {
+                    // when this bit is clear if lower nibble of upper byte is 0xA
+                    if ((addr & 0x0F00 )== 0x0A00) ram_enable = true;
+                    else ram_enable = false;
+                }
+            } else if (addr >= 0xA000 && addr <= 0xBFFF && ram_enable) {
+                ram[addr & 0x01FF] = data & 0x0F;
+            }
+
             break;
         case 0x11: // MBC3
         case 0x12: // MBC3 + RAM
@@ -156,6 +210,19 @@ uint8_t Cart::read_MBC(uint8_t mbc_mode, uint16_t addr) {
             return 0xFF;
             break;
         }
+        case 0x05: // MBC 2
+        case 0x06:
+            if (addr <= 0x3FFF) {
+                return rom.at(addr);
+            }
+            if (addr <= 0x7FFF) { //rom bank 1
+                uint32_t banked_addr = (get_rom_bank() * 0x4000)  + (addr - 0x4000);
+                return rom.at(banked_addr);
+            }
+            if (addr >= 0xA000 && addr <= 0xBFFF) { //RAM
+                return ram.at((addr & 0x01FF)) & 0x0F;
+            }
+            break;
         case 0x11: // MBC3
         case 0x12: // MBC3
         case 0x13: {
@@ -169,8 +236,8 @@ uint8_t Cart::read_MBC(uint8_t mbc_mode, uint16_t addr) {
             }
             if (addr >= 0xA000 && addr <= 0xBFFF) {
                 if (ram_enable) {
-                    uint16_t banked_addr = (get_ram_bank() * 0x2000) + (addr - 0xA000);
-                    return ram.at(banked_addr);
+                    uint16_t ram_addr = (get_ram_bank() * 0x2000) + (addr - 0xA000);
+                    return ram.at(ram_addr);
                 }
                 return 0xFF;
             }
@@ -187,6 +254,11 @@ uint8_t Cart::get_rom_bank() {
     if (cart_type >= 0x11 && cart_type <= 0x13) {
         return rom_bank_reg;
     }
+
+    if (cart_type == 0x05 || cart_type == 0x06) {
+        return rom_bank_reg;
+    }
+
     // MBC1
     if (bank_mode == 0) return rom_bank_reg;
     return (ram_bank_reg << 5) | rom_bank_reg;
@@ -196,6 +268,11 @@ uint8_t Cart::get_ram_bank() {
     // MBC 3
     if (cart_type >= 0x11 && cart_type <= 0x13) {
         return ram_bank_reg;
+    }
+
+    // MBC 2
+    if (cart_type == 0x05 || cart_type == 0x06) {
+
     }
 
     // MBC1

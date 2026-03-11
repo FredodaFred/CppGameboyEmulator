@@ -14,7 +14,6 @@ class Emulator {
     public:
         Emulator(CPU& cpu, Bus& bus, Timer& timer, PPU& ppu, Screen& screen, APU& apu);
         void run();
-
         void handle_isr();
 
     private:

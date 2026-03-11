@@ -18,7 +18,6 @@ Cart loadCart(std::string romPath) {
     return cart;
 }
 
-
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: ./emulator <rom_path>" << std::endl;
@@ -54,9 +53,11 @@ int main(int argc, char* argv[]) {
 
     try {
         emulator.run();
+        cart.create_save_file(); // Always save file after app is closed
     } catch (const std::runtime_error& e) {
         Logger::close();
         screen.close();
+        cart.create_save_file(); //try to save even if there was a crash
         std::cout << e.what() << std::endl;
     }
 }

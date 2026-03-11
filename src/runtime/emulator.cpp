@@ -10,6 +10,7 @@ void Emulator::run() {
     }
 }
 
+
 void Emulator::tick() {
     uint8_t m_cycles = cpu.step();
         
