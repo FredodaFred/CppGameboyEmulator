@@ -2,52 +2,52 @@ set(GLAD_SRC ${CMAKE_SOURCE_DIR}/external/src/glad.c)
 set_source_files_properties(${GLAD_SRC} PROPERTIES LANGUAGE C)
 
 add_library(Core STATIC
-    core/cart.cpp
-    core/cart.hpp
-    core/cpu.cpp
-    core/cpu.hpp
-    core/bus.cpp
-    core/bus.hpp
-    core/registers.cpp
-    core/registers.hpp
-    core/timer.cpp
-    core/timer.hpp
+        core/cart.cpp
+        core/cart.hpp
+        core/cpu.cpp
+        core/cpu.hpp
+        core/bus.cpp
+        core/bus.hpp
+        core/registers.cpp
+        core/registers.hpp
+        core/timer.cpp
+        core/timer.hpp
 
-    joypad/joypad.cpp
-    joypad/joypad.hpp
+        joypad/joypad.cpp
+        joypad/joypad.hpp
 
-    log/logger.hpp
-    log/logger.cpp
+        log/logger.hpp
+        log/logger.cpp
 
     ${GLAD_SRC}
 
-    graphics/screen.cpp
-    graphics/screen.hpp
-    graphics/ppu.cpp
-    graphics/ppu.hpp
+        graphics/screen.cpp
+        graphics/screen.hpp
+        graphics/ppu.cpp
+        graphics/ppu.hpp
 
-    audio/apu.cpp
-    audio/apu.hpp
-    audio/speaker.cpp
-    audio/speaker.hpp
-    audio/square_channel.cpp
-    audio/square_channel.hpp
-    audio/wave_channel.cpp
-    audio/wave_channel.hpp
-    audio/noise_channel.cpp
-    audio/noise_channel.hpp
+        audio/apu.cpp
+        audio/apu.hpp
+        audio/speaker.cpp
+        audio/speaker.hpp
+        audio/square_channel.cpp
+        audio/square_channel.hpp
+        audio/wave_channel.cpp
+        audio/wave_channel.hpp
+        audio/noise_channel.cpp
+        audio/noise_channel.hpp
 )
 
 target_include_directories(Core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+        .
     ${CMAKE_SOURCE_DIR}/external/include
     /opt/homebrew/include
 )
 
 add_executable(GameBoyCpp
-    runtime/emulator.hpp
-    runtime/emulator.cpp
-    runtime/main.cpp
+        runtime/emulator.hpp
+        runtime/emulator.cpp
+        runtime/main.cpp
 )
 
 find_package(OpenGL REQUIRED)

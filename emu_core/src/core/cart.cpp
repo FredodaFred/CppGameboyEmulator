@@ -15,6 +15,7 @@ void Cart::loadFromFile(const string& path) {
 
     file_name = path.substr(path.find_last_of('/') + 1);
     file_name = file_name.substr(0, file_name.find_last_of('.'));
+    file_path = path.substr(0, path.find_last_of('/')) + "/";
 
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
@@ -29,8 +30,7 @@ void Cart::loadFromFile(const string& path) {
 
 void Cart::create_save_file() {
     if (!save_ram) return;
-    std::filesystem::create_directories(SAVE_FOLDER);
-    string save_path = SAVE_FOLDER + file_name + ".sav";
+    string save_path = file_path + file_name + ".sav";
     std::ofstream file(save_path, std::ios::binary);
     if (file.is_open()) {
         file.write(reinterpret_cast<const char*>(ram.data()), ram.size());
@@ -38,7 +38,7 @@ void Cart::create_save_file() {
 }
 
 void Cart::load_ram() {
-    string save_path = SAVE_FOLDER + file_name + ".sav";
+    string save_path = file_path + file_name + ".sav";
     ifstream file(save_path, std::ios::binary);
     if (file.is_open()) {
         file.read(reinterpret_cast<char*>(ram.data()), ram.size());
