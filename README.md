@@ -16,10 +16,10 @@ saves. It utilizes OpenGL and GLFW for graphics, and SDL2 for sound.
 ### Emulator Launcher (emu_launcher)
 This code handles the bundling and distribution of my emulator. 
 It provides a small launcher app that executes the emulator binary so users dont have to.
-It is uses  the popular desktop framework framework [Tauri 2.0](https://v2.tauri.app/)
+It is uses  the popular desktop framework  [Tauri 2.0](https://v2.tauri.app/)
 
 ### Platform Support
-So far this emulator Apple (both intel and Mx chips). 
+So far this emulator only supports Apple (both intel and Mx chips). 
 
 ## Build Instructions
 
