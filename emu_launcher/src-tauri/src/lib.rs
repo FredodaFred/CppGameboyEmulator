@@ -10,7 +10,16 @@ fn greet(name: &str) -> String {
 fn launch_emulator(rom_path: String, app: tauri::AppHandle) -> Result<(), String> {
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
 
-    Command::new(resource_dir.join("GameBoyCpp"))
+    let release_path = resource_dir.join("../MacOS/GameBoyCpp");
+    let dev_path = resource_dir.join("GameBoyCpp");
+
+    let binary_path = if release_path.exists() {
+        release_path
+    } else {
+        dev_path
+    };
+
+    Command::new(&binary_path)
         .arg(&rom_path)
         .spawn()
         .map_err(|e| e.to_string())?;
