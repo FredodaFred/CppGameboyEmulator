@@ -12,7 +12,6 @@ void PPU::tick(int cycles) {
 }
 
 void PPU::tick_dot() {
-
     // VBLANK Behavior
     if (LY >= 144) {
         //std::cout << std::format("LY: {}", LY) << std::endl;
@@ -23,16 +22,14 @@ void PPU::tick_dot() {
         }
 
         if (dots >= 456) {
-
             if (LY == 153) {
                 LY = 0;
                 set_mode(OAM_SCAN);
                 screen.render(frame_buffer, FRAME_BUFFER_SIZE);
+            } else {
+                increment_LY();
             }
-
             dots = 0;
-            increment_LY();
-
             if ((STAT & 0x10)) requestStatInterrupt();
         }
         if (LY != 0) dots++;
@@ -41,7 +38,6 @@ void PPU::tick_dot() {
     if (dots == 0) {
         set_mode(OAM_SCAN);
         oam_scan();
-        if (STAT & 0x20) requestStatInterrupt();
 
     } else if (dots == 80) {
         set_mode(DRAW);
@@ -50,7 +46,6 @@ void PPU::tick_dot() {
         draw_scanline();
     } else if (dots == 252 + hblank_penalty_dots) {
         set_mode(HBLANK);
-        if (STAT & 0x08) requestStatInterrupt();
     } else if (dots >= 456) {
         increment_LY();
         dots = 0;
