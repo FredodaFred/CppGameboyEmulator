@@ -54,6 +54,8 @@ class PPU {
 
         void increment_LY();
 
+        void lyc_ly_coincidence_check();
+
         void requestStatInterrupt();
 
         void draw_scanline();

@@ -27,9 +27,11 @@ void Speaker::init() {
 void Speaker::play_sample(int16_t left, int16_t right) {
     if (device_id == 0) return;
 
-    // This logic somehow saves us
+    int timeout = 0;
+    // almost like a rate limiter for the emulator
     while (SDL_GetQueuedAudioSize(device_id) > 3840) {
         std::this_thread::yield();
+        if (++timeout > 10000) break;
     }
 
     int16_t frame[2] = { left, right };

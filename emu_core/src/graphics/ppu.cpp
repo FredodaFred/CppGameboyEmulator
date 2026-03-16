@@ -13,57 +13,47 @@ void PPU::tick(int cycles) {
 
 void PPU::tick_dot() {
     dots++;
-    if (LY >= 144) {
+    // Vblank
+    if (LY >= 144 || mode == VBLANK) {
         if (dots == 1 && LY == 144) {
             set_mode(VBLANK);
             vblank_interrupt = true;
             window_internal_line_counter = 0;
         }
+        if (LY == 153 && dots == 4) {
+            LY = 0;
+            screen.render(frame_buffer, FRAME_BUFFER_SIZE);
+            lyc_ly_coincidence_check();
+        }
+
         if (dots >= 456) {
-            dots = 0;
-            increment_LY();
-            if ((STAT & 0x10)) {
-                requestStatInterrupt();
-            }
-            if (LY == 153) {
-                LY = 0;
+            if (LY != 0) {
+                increment_LY();
+            } else {
                 set_mode(OAM_SCAN);
-                screen.render(frame_buffer, FRAME_BUFFER_SIZE);
             }
+            dots = 0;
         }
         return;
     }
 
+    // State machine
     if (dots == 1) {
         set_mode(OAM_SCAN);
-        if(STAT & 0x20) {
-            requestStatInterrupt();
-        }
-        if (!oam_scanned) {
-            oam_scan();
-        }
+        oam_scan();
+
     } else if (dots == 81) {
         set_mode(DRAW);
         pixels_pushed = 0;
-        if (!scanline_drawn) {
-            draw_scanline();
-        }
+        draw_scanline();
 
     } else if (dots == 253) {
-        if (!hblank_happened) {
-            set_mode(HBLANK);
-            if(STAT & 0x08) {
-                requestStatInterrupt();
-            }
-        }
+        set_mode(HBLANK);
     }
 
     if (dots >= 456) {
         dots = 0;
         increment_LY();
-        oam_scanned = false;
-        scanline_drawn = false;
-        hblank_happened = false;
     }
 }
 
@@ -268,6 +258,10 @@ uint8_t PPU::map_color_id_to_color_palette(uint8_t color_id, uint8_t palette) {
 
 void PPU::increment_LY() {
     LY++;
+    lyc_ly_coincidence_check();
+}
+
+void PPU::lyc_ly_coincidence_check() {
     if (LY == LYC) {
         setSTATBit(2, true);
         uint8_t SS_LYC = (1 << 6);
