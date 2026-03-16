@@ -12,59 +12,52 @@ void PPU::tick(int cycles) {
 }
 
 void PPU::tick_dot() {
-    dots++;
+
+    // VBLANK Behavior
     if (LY >= 144) {
-        if (dots == 1 && LY == 144) {
+        //std::cout << std::format("LY: {}", LY) << std::endl;
+        if (dots == 0 && LY == 144) {
             set_mode(VBLANK);
             vblank_interrupt = true;
             window_internal_line_counter = 0;
         }
+
         if (dots >= 456) {
-            dots = 0;
-            increment_LY();
-            if ((STAT & 0x10)) {
-                requestStatInterrupt();
-            }
+
             if (LY == 153) {
                 LY = 0;
                 set_mode(OAM_SCAN);
                 screen.render(frame_buffer, FRAME_BUFFER_SIZE);
             }
+
+            dots = 0;
+            increment_LY();
+
+            if ((STAT & 0x10)) requestStatInterrupt();
         }
+        if (LY != 0) dots++;
+    }
+
+    if (dots == 0) {
+        set_mode(OAM_SCAN);
+        oam_scan();
+        if (STAT & 0x20) requestStatInterrupt();
+
+    } else if (dots == 80) {
+        set_mode(DRAW);
+        pixels_pushed = 0;
+        hblank_penalty_dots = 0;
+        draw_scanline();
+    } else if (dots == 252 + hblank_penalty_dots) {
+        set_mode(HBLANK);
+        if (STAT & 0x08) requestStatInterrupt();
+    } else if (dots >= 456) {
+        increment_LY();
+        dots = 0;
         return;
     }
 
-    if (dots == 1) {
-        set_mode(OAM_SCAN);
-        if(STAT & 0x20) {
-            requestStatInterrupt();
-        }
-        if (!oam_scanned) {
-            oam_scan();
-        }
-    } else if (dots == 81) {
-        set_mode(DRAW);
-        pixels_pushed = 0;
-        if (!scanline_drawn) {
-            draw_scanline();
-        }
-
-    } else if (dots == 253) {
-        if (!hblank_happened) {
-            set_mode(HBLANK);
-            if(STAT & 0x08) {
-                requestStatInterrupt();
-            }
-        }
-    }
-
-    if (dots >= 456) {
-        dots = 0;
-        increment_LY();
-        oam_scanned = false;
-        scanline_drawn = false;
-        hblank_happened = false;
-    }
+    dots++;
 }
 
 void PPU::draw_scanline() {
@@ -81,26 +74,31 @@ void PPU::draw_scanline() {
         uint16_t tile_data = get_tile_data(window_triggered_on_line, tile_id);
         tile_data_to_pixels(window_triggered_on_line, tile_data);
     }
+
     if (window_triggered_on_line) {
         window_internal_line_counter++;
+        hblank_penalty_dots += 6;
     }
 
-    draw_sprites_onto_scanline();
+    draw_sprites_onto_scanline(window_triggered_on_line);
+
+    hblank_penalty_dots += SCX % 8;
     scanline_drawn = true;
 }
 
-void PPU::draw_sprites_onto_scanline() {
+void PPU::draw_sprites_onto_scanline(bool window_enabled_on_line) {
     if (!(LCDC & 0x02)) return; // OBJ disabled
     bool sprite_drawn[160] = {};
+    std::unordered_map<uint8_t, bool> pixels_drawn_on_tile;
 
     for (const Sprite& sprite : sprite_buffer) {
         uint8_t y_pos  = sprite.y;
         uint8_t x_pos  = sprite.x;
         uint8_t tile_id   = sprite.tile_id;
         uint8_t attr_flags = sprite.attr;
-        bool x_flip = (attr_flags & 0x20) != 0;
 
-        // Y = Object’s vertical position on the screen + 16. So for exampl
+
+        bool x_flip = (attr_flags & 0x20) != 0;
         bool y_flip = (attr_flags & 0x40) != 0;
         uint8_t sprite_row = LY - (y_pos - 16);
         uint8_t sprite_height = (LCDC & 0x04) ? 16 : 8;
@@ -112,6 +110,28 @@ void PPU::draw_sprites_onto_scanline() {
         uint8_t low  = read_vram_internal(tile_addr);
         uint8_t high = read_vram_internal(tile_addr + 1);
 
+        // OBJ penalty - calculated once per sprite before pixel loop
+        uint8_t leftmost_pixel_x = x_pos - 8;
+        bool in_window = window_enabled_on_line && (leftmost_pixel_x >= (WX - 7));
+
+        if (!in_window) {
+            uint8_t bg_tile_x = (leftmost_pixel_x + SCX) % 8;
+            if (!pixels_drawn_on_tile.contains(bg_tile_x)) {
+                pixels_drawn_on_tile[bg_tile_x] = true;
+                int pixels_right = 7 - bg_tile_x;
+                hblank_penalty_dots += std::max(0, pixels_right - 2);
+            }
+        } else {
+            uint8_t window_tile_x = (leftmost_pixel_x - (WX - 7)) % 8;
+            if (!pixels_drawn_on_tile.contains(window_tile_x)) {
+                pixels_drawn_on_tile[window_tile_x] = true;
+                int pixels_right = 7 - window_tile_x;
+                hblank_penalty_dots += std::max(0, pixels_right - 2);
+            }
+        }
+
+        hblank_penalty_dots += 6; // The flat 6-dot penalty for fetching OBJS Tile
+
         // iterate through tile's pixels
         for (int i = 0; i < 8; i++) {
             uint8_t bit_idx = 7 - i;
@@ -119,9 +139,12 @@ void PPU::draw_sprites_onto_scanline() {
             uint8_t b1 = (high >> bit_idx) & 1;
             uint8_t tile_pixel = (b1 << 1) | b0;
 
+            //OBJ penalty algo
+
             int screen_x = x_flip ?  x_pos - 8 + (7 - i) : x_pos - 8 + i;
             // Verify sprite is not hidden
             if (screen_x < 0 || screen_x >= 160) continue;
+
 
             // Do not render transparent pixels
             bool dmg_palette = (attr_flags & 0x10) != 0;
@@ -153,7 +176,11 @@ void PPU::oam_scan() {
         uint8_t attr_flags = OAM[byte+3];
 
         // Conditions to not render sprite
-        if (x_pos == 0) continue; // Not visible
+        if (x_pos == 0) {
+            // Not visible
+            hblank_penalty_dots += 11;
+            continue;
+        }
         if (sprite_buffer.size() >= 10) continue;
         bool on_current_line = (y_pos <= LY + 16) && (y_pos + sprite_height > LY + 16);
         if (!on_current_line) continue;
@@ -271,12 +298,11 @@ void PPU::increment_LY() {
     if (LY == LYC) {
         setSTATBit(2, true);
         uint8_t SS_LYC = (1 << 6);
-        if (STAT & SS_LYC) {
-            requestStatInterrupt();
-        }
-    } else {
-        setSTATBit(2, false);
+        if (STAT & SS_LYC) requestStatInterrupt();
+        return;
     }
+
+    setSTATBit(2, false);
 }
 
 void PPU::requestStatInterrupt() {
