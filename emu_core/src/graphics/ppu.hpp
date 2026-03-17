@@ -44,7 +44,6 @@ class PPU {
 
         // This is the time unit. 1 clock cycle = 4 dots;
         int dots{0};
-        int hblank_penalty_dots{0};
         int window_internal_line_counter{0};
 
         // Mode executors
@@ -61,7 +60,7 @@ class PPU {
 
         void draw_scanline();
 
-        void draw_sprites_onto_scanline(bool window_enabled_on_line);
+        void draw_sprites_onto_scanline();
 
         bool is_window_tile(uint8_t pixels_pushed) const;
 

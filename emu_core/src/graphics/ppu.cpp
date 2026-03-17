@@ -12,46 +12,49 @@ void PPU::tick(int cycles) {
 }
 
 void PPU::tick_dot() {
-    // VBLANK Behavior
-    if (LY >= 144) {
-        if (dots == 0 && LY == 144) {
+    dots++;
+    // Vblank
+    if (LY >= 144 || mode == VBLANK) {
+        if (dots == 1 && LY == 144) {
             set_mode(VBLANK);
             vblank_interrupt = true;
             window_internal_line_counter = 0;
         }
+        if (LY == 153 && dots == 4) {
+            LY = 0;
+            screen.render(frame_buffer, FRAME_BUFFER_SIZE);
+            lyc_ly_coincidence_check();
+        }
 
         if (dots >= 456) {
-            if (LY == 153) {
-                LY = 0;
-                set_mode(OAM_SCAN);
-                screen.render(frame_buffer, FRAME_BUFFER_SIZE);
-            } else {
+            if (LY != 0) {
                 increment_LY();
+            } else {
+                set_mode(OAM_SCAN);
             }
             dots = 0;
-            if ((STAT & 0x10)) requestStatInterrupt();
         }
-        if (LY != 0) dots++;
-    }
-
-    if (dots == 0) {
-        set_mode(OAM_SCAN);
-        oam_scan();
-
-    } else if (dots == 80) {
-        set_mode(DRAW);
-        pixels_pushed = 0;
-        hblank_penalty_dots = 0;
-        draw_scanline();
-    } else if (dots == 252 + hblank_penalty_dots) {
-        set_mode(HBLANK);
-    } else if (dots >= 456) {
-        increment_LY();
-        dots = 0;
         return;
     }
 
-    dots++;
+    // State machine
+    if (dots == 1) {
+        set_mode(OAM_SCAN);
+        oam_scan();
+
+    } else if (dots == 81) {
+        set_mode(DRAW);
+        pixels_pushed = 0;
+        draw_scanline();
+
+    } else if (dots == 253) {
+        set_mode(HBLANK);
+    }
+
+    if (dots >= 456) {
+        dots = 0;
+        increment_LY();
+    }
 }
 
 void PPU::draw_scanline() {
@@ -68,31 +71,26 @@ void PPU::draw_scanline() {
         uint16_t tile_data = get_tile_data(window_triggered_on_line, tile_id);
         tile_data_to_pixels(window_triggered_on_line, tile_data);
     }
-
     if (window_triggered_on_line) {
         window_internal_line_counter++;
-        hblank_penalty_dots += 6;
     }
 
-    draw_sprites_onto_scanline(window_triggered_on_line);
-
-    hblank_penalty_dots += SCX % 8;
+    draw_sprites_onto_scanline();
     scanline_drawn = true;
 }
 
-void PPU::draw_sprites_onto_scanline(bool window_enabled_on_line) {
+void PPU::draw_sprites_onto_scanline() {
     if (!(LCDC & 0x02)) return; // OBJ disabled
     bool sprite_drawn[160] = {};
-    std::unordered_map<uint8_t, bool> pixels_drawn_on_tile;
 
     for (const Sprite& sprite : sprite_buffer) {
         uint8_t y_pos  = sprite.y;
         uint8_t x_pos  = sprite.x;
         uint8_t tile_id   = sprite.tile_id;
         uint8_t attr_flags = sprite.attr;
-
-
         bool x_flip = (attr_flags & 0x20) != 0;
+
+        // Y = Object’s vertical position on the screen + 16. So for exampl
         bool y_flip = (attr_flags & 0x40) != 0;
         uint8_t sprite_row = LY - (y_pos - 16);
         uint8_t sprite_height = (LCDC & 0x04) ? 16 : 8;
@@ -104,28 +102,6 @@ void PPU::draw_sprites_onto_scanline(bool window_enabled_on_line) {
         uint8_t low  = read_vram_internal(tile_addr);
         uint8_t high = read_vram_internal(tile_addr + 1);
 
-        // OBJ penalty - calculated once per sprite before pixel loop
-        uint8_t leftmost_pixel_x = x_pos - 8;
-        bool in_window = window_enabled_on_line && (leftmost_pixel_x >= (WX - 7));
-
-        if (!in_window) {
-            uint8_t bg_tile_x = (leftmost_pixel_x + SCX) % 8;
-            if (!pixels_drawn_on_tile.contains(bg_tile_x)) {
-                pixels_drawn_on_tile[bg_tile_x] = true;
-                int pixels_right = 7 - bg_tile_x;
-                hblank_penalty_dots += std::max(0, pixels_right - 2);
-            }
-        } else {
-            uint8_t window_tile_x = (leftmost_pixel_x - (WX - 7)) % 8;
-            if (!pixels_drawn_on_tile.contains(window_tile_x)) {
-                pixels_drawn_on_tile[window_tile_x] = true;
-                int pixels_right = 7 - window_tile_x;
-                hblank_penalty_dots += std::max(0, pixels_right - 2);
-            }
-        }
-
-        hblank_penalty_dots += 6; // The flat 6-dot penalty for fetching OBJS Tile
-
         // iterate through tile's pixels
         for (int i = 0; i < 8; i++) {
             uint8_t bit_idx = 7 - i;
@@ -133,12 +109,9 @@ void PPU::draw_sprites_onto_scanline(bool window_enabled_on_line) {
             uint8_t b1 = (high >> bit_idx) & 1;
             uint8_t tile_pixel = (b1 << 1) | b0;
 
-            //OBJ penalty algo
-
             int screen_x = x_flip ?  x_pos - 8 + (7 - i) : x_pos - 8 + i;
             // Verify sprite is not hidden
             if (screen_x < 0 || screen_x >= 160) continue;
-
 
             // Do not render transparent pixels
             bool dmg_palette = (attr_flags & 0x10) != 0;
@@ -170,11 +143,7 @@ void PPU::oam_scan() {
         uint8_t attr_flags = OAM[byte+3];
 
         // Conditions to not render sprite
-        if (x_pos == 0) {
-            // Not visible
-            hblank_penalty_dots += 11;
-            continue;
-        }
+        if (x_pos == 0) continue; // Not visible
         if (sprite_buffer.size() >= 10) continue;
         bool on_current_line = (y_pos <= LY + 16) && (y_pos + sprite_height > LY + 16);
         if (!on_current_line) continue;
@@ -289,14 +258,19 @@ uint8_t PPU::map_color_id_to_color_palette(uint8_t color_id, uint8_t palette) {
 
 void PPU::increment_LY() {
     LY++;
+    lyc_ly_coincidence_check();
+}
+
+void PPU::lyc_ly_coincidence_check() {
     if (LY == LYC) {
         setSTATBit(2, true);
         uint8_t SS_LYC = (1 << 6);
-        if (STAT & SS_LYC) requestStatInterrupt();
-        return;
+        if (STAT & SS_LYC) {
+            requestStatInterrupt();
+        }
+    } else {
+        setSTATBit(2, false);
     }
-
-    setSTATBit(2, false);
 }
 
 void PPU::requestStatInterrupt() {
